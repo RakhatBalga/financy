@@ -15,11 +15,15 @@ alembic==1.14.0
 redis==5.2.1
 
 # --- Config ---
-pydantic==2.10.4
-pydantic-settings==2.7.0
+# pydantic pinned <2.10 to satisfy aiogram 3.15.x
+pydantic==2.9.2
+pydantic-settings==2.6.1
 
 # --- AI: Gemini structured output ---
 google-genai==0.8.0
+
+# --- Charts ---
+matplotlib==3.10.0
 
 # --- Logging ---
 structlog==24.4.0

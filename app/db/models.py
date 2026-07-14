@@ -38,6 +38,10 @@ class User(Base):
     )
     username: Mapped[str | None] = mapped_column(String(64), nullable=True)
     currency: Mapped[str] = mapped_column(String(8), nullable=False, default="KZT")
+    # Declared monthly income; enables the 50/30/20 advice. NULL until set.
+    monthly_income: Mapped[float | None] = mapped_column(
+        Numeric(14, 2), nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
@@ -65,6 +69,8 @@ class Category(Base):
     )
     name: Mapped[str] = mapped_column(String(64), nullable=False)
     is_default: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    # 50/30/20 bucket: "needs" | "wants" (income categories stay NULL).
+    group_type: Mapped[str | None] = mapped_column(String(16), nullable=True)
 
     user: Mapped[User] = relationship(back_populates="categories")
     transactions: Mapped[list[Transaction]] = relationship(

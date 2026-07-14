@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
-from aiogram import Router
+from aiogram import F, Router
 from aiogram.filters import Command
 from aiogram.types import Message
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.bot.formatters import format_period_report
+from app.bot.keyboards import BTN_MONTH, BTN_TODAY
 from app.services.analytics_service import AnalyticsService
 from app.services.user_service import UserService
 
@@ -24,6 +25,7 @@ async def _require_user(message: Message, session: AsyncSession):
 
 
 @router.message(Command("today"))
+@router.message(F.text == BTN_TODAY)
 async def cmd_today(message: Message, session: AsyncSession) -> None:
     user = await _require_user(message, session)
     if user is None:
@@ -42,6 +44,7 @@ async def cmd_week(message: Message, session: AsyncSession) -> None:
 
 
 @router.message(Command("month"))
+@router.message(F.text == BTN_MONTH)
 async def cmd_month(message: Message, session: AsyncSession) -> None:
     user = await _require_user(message, session)
     if user is None:

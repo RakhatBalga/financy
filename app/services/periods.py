@@ -50,3 +50,28 @@ def month_range() -> tuple[datetime, datetime]:
 def current_month_key() -> str:
     """``"YYYY-MM"`` key for the current month (used by budgets)."""
     return _now().strftime("%Y-%m")
+
+
+def month_range_offset(months_ago: int) -> tuple[datetime, datetime]:
+    """Range for a month ``months_ago`` months before the current one.
+
+    ``months_ago=0`` is the current month, ``1`` the previous, etc.
+    """
+    now = _now()
+    year, month = now.year, now.month - months_ago
+    while month <= 0:
+        month += 12
+        year -= 1
+    start = now.replace(
+        year=year, month=month, day=1, hour=0, minute=0, second=0, microsecond=0
+    )
+    if month == 12:
+        end = start.replace(year=year + 1, month=1)
+    else:
+        end = start.replace(month=month + 1)
+    return start, end
+
+
+def days_ago(days: int) -> datetime:
+    """Timestamp ``days`` days before now (for lookback windows)."""
+    return _now() - timedelta(days=days)

@@ -16,6 +16,11 @@ from app.services.budget_service import BudgetService
 
 log = structlog.get_logger(__name__)
 
+_REMINDER_TEXT = (
+    "🌙 Не забудь записать траты за сегодня — просто напиши, например "
+    "<i>ужин 3500</i>."
+)
+
 
 async def check_budgets(bot: Bot) -> None:
     """Daily: warn users whose category spending crossed 80% / 100%.
@@ -59,3 +64,23 @@ async def weekly_digest(bot: Bot) -> None:
             await asyncio.sleep(0.05)
 
     log.info("weekly_digest_done", sent=sent)
+
+
+async def daily_reminder(bot: Bot) -> None:
+    """Evening nudge for users who logged no expense today."""
+    async with async_session_factory() as session:
+        users = await UserRepository(session).list_all()
+        analytics = AnalyticsService(session)
+
+        sent = 0
+        for user in users:
+            if await analytics.has_spending_today(user):
+                continue
+            try:
+                await bot.send_message(user.telegram_id, _REMINDER_TEXT)
+                sent += 1
+            except TelegramForbiddenError:
+                log.info("reminder_skipped_blocked", user_id=user.id)
+            await asyncio.sleep(0.05)
+
+    log.info("daily_reminder_done", sent=sent)

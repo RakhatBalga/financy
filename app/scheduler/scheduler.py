@@ -7,7 +7,7 @@ from apscheduler.triggers.cron import CronTrigger
 from aiogram import Bot
 
 from app.core.config import settings
-from app.scheduler.jobs import check_budgets, weekly_digest
+from app.scheduler.jobs import check_budgets, daily_reminder, weekly_digest
 
 
 def create_scheduler(bot: Bot) -> AsyncIOScheduler:
@@ -30,6 +30,13 @@ def create_scheduler(bot: Bot) -> AsyncIOScheduler:
         trigger=CronTrigger(day_of_week="sun", hour=19, minute=0),
         args=[bot],
         id="weekly_digest",
+        replace_existing=True,
+    )
+    scheduler.add_job(
+        daily_reminder,
+        trigger=CronTrigger(hour=21, minute=0),
+        args=[bot],
+        id="daily_reminder",
         replace_existing=True,
     )
     return scheduler

@@ -89,3 +89,43 @@ class TransactionService:
         )
         await self._session.commit()
         return transaction
+
+    async def _owned(self, user_id: int, transaction_id: int) -> Transaction | None:
+        """Fetch a transaction only if it belongs to the user."""
+        transaction = await self._session.get(Transaction, transaction_id)
+        if transaction is None or transaction.user_id != user_id:
+            return None
+        return transaction
+
+    async def update_amount(
+        self, user_id: int, transaction_id: int, amount: float
+    ) -> Transaction | None:
+        """Change the amount of an owned transaction."""
+        if amount <= 0:
+            return None
+        transaction = await self._owned(user_id, transaction_id)
+        if transaction is None:
+            return None
+        transaction.amount = amount
+        await self._session.commit()
+        log.info(
+            "transaction_amount_updated",
+            user_id=user_id,
+            transaction_id=transaction_id,
+            amount=amount,
+        )
+        return transaction
+
+    async def delete(self, user_id: int, transaction_id: int) -> bool:
+        """Delete an owned transaction. Returns ``True`` if deleted."""
+        transaction = await self._owned(user_id, transaction_id)
+        if transaction is None:
+            return False
+        await self._session.delete(transaction)
+        await self._session.commit()
+        log.info(
+            "transaction_deleted",
+            user_id=user_id,
+            transaction_id=transaction_id,
+        )
+        return True

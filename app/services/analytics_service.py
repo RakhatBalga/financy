@@ -70,6 +70,113 @@ class AnalyticsService:
         start, end = periods.month_range()
         return await self.period_report(user, "Этот месяц", start, end)
 
+    async def has_spending_today(self, user: User) -> bool:
+        """True if the user logged at least one expense today."""
+        start, end = periods.today_range()
+        total = await self._transactions.total_amount(
+            user.id, TransactionType.expense, start, end
+        )
+        return total > 0
+
+    async def month_shares(self, user: User) -> dict[str, float]:
+        """Current-month expense share (%) per category name."""
+        start, end = periods.month_range()
+        rows = await self._transactions.total_by_category(
+            user.id, TransactionType.expense, start, end
+        )
+        total = sum(a for _, a in rows)
+        if total <= 0:
+            return {}
+        return {name: amount / total * 100.0 for name, amount in rows}
+
+    async def group_totals(self, user: User) -> dict[str, float]:
+        """Current-month expense totals by 50/30/20 bucket."""
+        start, end = periods.month_range()
+        return await self._transactions.total_by_group(
+            user.id, TransactionType.expense, start, end
+        )
+
+    async def detect_anomalies(
+        self, user: User, lookback_months: int = 3, threshold: float = 1.4
+    ) -> list[dict[str, object]]:
+        """Categories where this month's spend far exceeds the recent norm.
+
+        Compares the current month against the average of the previous
+        ``lookback_months`` full months. Flags a category when current spend
+        is at least ``threshold`` times its average and the increase is
+        material (avoids noise on tiny amounts).
+        """
+        cur_start, cur_end = periods.month_range()
+        current = dict(
+            await self._transactions.total_by_category(
+                user.id, TransactionType.expense, cur_start, cur_end
+            )
+        )
+
+        # Accumulate per-category totals across the prior months.
+        history: dict[str, float] = {}
+        for offset in range(1, lookback_months + 1):
+            start, end = periods.month_range_offset(offset)
+            for name, amount in await self._transactions.total_by_category(
+                user.id, TransactionType.expense, start, end
+            ):
+                history[name] = history.get(name, 0.0) + amount
+
+        anomalies: list[dict[str, object]] = []
+        for name, cur_amount in current.items():
+            avg = history.get(name, 0.0) / lookback_months
+            if avg <= 0:
+                continue
+            ratio = cur_amount / avg
+            if ratio >= threshold and (cur_amount - avg) >= 1000:
+                anomalies.append(
+                    {
+                        "category": name,
+                        "current": cur_amount,
+                        "average": avg,
+                        "ratio": ratio,
+                    }
+                )
+        anomalies.sort(key=lambda a: a["ratio"], reverse=True)  # type: ignore[arg-type]
+        return anomalies
+
+    async def detect_subscriptions(
+        self, user: User, lookback_days: int = 100, min_months: int = 2
+    ) -> list[dict[str, object]]:
+        """Heuristic recurring-payment detector.
+
+        Groups recent expenses by ``(description, amount)`` and reports those
+        that appear in at least ``min_months`` distinct calendar months —
+        a strong signal of a subscription or regular bill.
+        """
+        since = periods.days_ago(lookback_days)
+        transactions = await self._transactions.list_since(
+            user.id, TransactionType.expense, since
+        )
+
+        groups: dict[tuple[str, float], set[str]] = {}
+        for tx in transactions:
+            key = (
+                (tx.description or "").strip().lower(),
+                round(float(tx.amount)),
+            )
+            if not key[0]:
+                continue
+            groups.setdefault(key, set()).add(tx.created_at.strftime("%Y-%m"))
+
+        subs: list[dict[str, object]] = []
+        for (description, amount), months in groups.items():
+            if len(months) >= min_months:
+                subs.append(
+                    {
+                        "description": description,
+                        "amount": float(amount),
+                        "months": len(months),
+                    }
+                )
+        subs.sort(key=lambda s: s["amount"], reverse=True)  # type: ignore[arg-type]
+        return subs
+
     async def weekly_digest(self, user: User) -> dict[str, object]:
         """Compare this week's spending with last week's.
 

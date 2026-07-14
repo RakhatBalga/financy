@@ -34,3 +34,8 @@ class UserRepository:
         """Return every user (used by scheduled jobs)."""
         result = await self._session.execute(select(User))
         return list(result.scalars().all())
+
+    async def set_income(self, user: User, monthly_income: float) -> None:
+        """Persist the user's declared monthly income."""
+        user.monthly_income = monthly_income
+        await self._session.flush()

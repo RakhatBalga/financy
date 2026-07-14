@@ -45,7 +45,10 @@ async def handle_free_text(
         return
     except Exception:  # noqa: BLE001 - surface AI/transport failures gracefully
         log.exception("parse_failed", text=message.text)
-        await message.answer("Сервис распознавания недоступен, попробуй позже.")
+        await message.answer(
+            "⏳ Gemini сейчас перегружен. Отправь сообщение ещё раз через "
+            "пару секунд."
+        )
         return
 
     # Persist immediately; the inline keyboard lets the user re-categorize.

@@ -47,3 +47,11 @@ class UserService:
 
     async def get(self, telegram_id: int) -> User | None:
         return await self._users.get_by_telegram_id(telegram_id)
+
+    async def set_income(self, user: User, monthly_income: float) -> None:
+        """Store the user's monthly income (enables 50/30/20 advice)."""
+        if monthly_income <= 0:
+            raise ValueError("income must be positive")
+        await self._users.set_income(user, monthly_income)
+        await self._session.commit()
+        log.info("income_set", user_id=user.id)

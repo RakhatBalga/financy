@@ -7,6 +7,7 @@ from aiogram.filters import CommandStart
 from aiogram.types import Message
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.bot.keyboards import main_reply_keyboard
 from app.services.user_service import UserService
 
 router = Router(name="start")
@@ -18,10 +19,15 @@ _WELCOME = (
     "• <i>такси 1500</i>\n"
     "• <i>зарплата 400000</i>\n\n"
     "Команды:\n"
-    "/today — траты за сегодня\n"
-    "/week — за неделю\n"
-    "/month — за месяц\n"
-    "/setbudget &lt;категория&gt; &lt;сумма&gt; — лимит на месяц"
+    "/today · /week · /month — отчёты за период\n"
+    "/chart — график расходов за месяц\n"
+    "/recent — изменить или удалить траты\n"
+    "/setbudget &lt;категория&gt; &lt;сумма&gt; — лимит на месяц\n"
+    "/income &lt;сумма&gt; — указать доход\n"
+    "/rule — правило 50/30/20\n"
+    "/advice — AI-разбор месяца и советы\n"
+    "/benchmark — сравнение со средним по Казахстану\n"
+    "/subscriptions — найти регулярные платежи"
 )
 
 
@@ -34,4 +40,4 @@ async def cmd_start(message: Message, session: AsyncSession) -> None:
         username=message.from_user.username,
     )
     prefix = "" if created else "С возвращением!\n\n"
-    await message.answer(prefix + _WELCOME)
+    await message.answer(prefix + _WELCOME, reply_markup=main_reply_keyboard())

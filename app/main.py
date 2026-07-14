@@ -17,7 +17,8 @@ import contextlib
 
 import structlog
 import uvicorn
-from aiogram.types import Update
+from aiogram import Bot
+from aiogram.types import BotCommand, Update
 from fastapi import FastAPI, Request, Response
 
 from app.bot.dispatcher import create_bot, create_dispatcher
@@ -26,6 +27,26 @@ from app.core.logging import configure_logging
 from app.scheduler.scheduler import create_scheduler
 
 log = structlog.get_logger(__name__)
+
+_BOT_COMMANDS = [
+    BotCommand(command="start", description="Начать / помощь"),
+    BotCommand(command="today", description="Траты за сегодня"),
+    BotCommand(command="week", description="Траты за неделю"),
+    BotCommand(command="month", description="Траты за месяц"),
+    BotCommand(command="chart", description="График за месяц"),
+    BotCommand(command="recent", description="Изменить/удалить траты"),
+    BotCommand(command="setbudget", description="Лимит по категории"),
+    BotCommand(command="income", description="Указать доход"),
+    BotCommand(command="rule", description="Правило 50/30/20"),
+    BotCommand(command="advice", description="AI-разбор месяца"),
+    BotCommand(command="benchmark", description="Сравнение со средним по РК"),
+    BotCommand(command="subscriptions", description="Найти подписки"),
+]
+
+
+async def _set_commands(bot: Bot) -> None:
+    """Publish the command menu shown in Telegram's UI."""
+    await bot.set_my_commands(_BOT_COMMANDS)
 
 
 async def _run_polling() -> None:
@@ -36,6 +57,7 @@ async def _run_polling() -> None:
 
     scheduler.start()
     await bot.delete_webhook(drop_pending_updates=True)
+    await _set_commands(bot)
     log.info("starting_polling")
     try:
         await dp.start_polling(bot)
@@ -61,6 +83,7 @@ def _build_webhook_app() -> FastAPI:
             secret_token=settings.webhook_secret or None,
             drop_pending_updates=True,
         )
+        await _set_commands(bot)
         log.info("webhook_set", url=webhook_url)
 
     @app.on_event("shutdown")
