@@ -42,8 +42,13 @@ services:
       - "8080"
     restart: unless-stopped
 
+  # Only needed for webhook mode. Start it explicitly with:
+  #   docker compose --profile webhook up -d
+  # In the default (long-polling) deploy it stays off, so there is no port-80
+  # conflict on a shared server.
   nginx:
     image: nginx:1.27-alpine
+    profiles: ["webhook"]
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
     ports:
