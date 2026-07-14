@@ -1,0 +1,52 @@
+"""Helpers for computing period boundaries in the app timezone."""
+
+from __future__ import annotations
+
+from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
+
+from app.core.config import settings
+
+_TZ = ZoneInfo(settings.tz)
+
+
+def _now() -> datetime:
+    return datetime.now(tz=_TZ)
+
+
+def today_range() -> tuple[datetime, datetime]:
+    """``[start of today, start of tomorrow)`` in the app timezone."""
+    now = _now()
+    start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    return start, start + timedelta(days=1)
+
+
+def week_range() -> tuple[datetime, datetime]:
+    """Current ISO week ``[Monday 00:00, next Monday 00:00)``."""
+    now = _now()
+    start = (now - timedelta(days=now.weekday())).replace(
+        hour=0, minute=0, second=0, microsecond=0
+    )
+    return start, start + timedelta(days=7)
+
+
+def previous_week_range() -> tuple[datetime, datetime]:
+    """The full ISO week before the current one."""
+    start, end = week_range()
+    return start - timedelta(days=7), start
+
+
+def month_range() -> tuple[datetime, datetime]:
+    """Current calendar month ``[1st 00:00, 1st of next month 00:00)``."""
+    now = _now()
+    start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    if start.month == 12:
+        end = start.replace(year=start.year + 1, month=1)
+    else:
+        end = start.replace(month=start.month + 1)
+    return start, end
+
+
+def current_month_key() -> str:
+    """``"YYYY-MM"`` key for the current month (used by budgets)."""
+    return _now().strftime("%Y-%m")
