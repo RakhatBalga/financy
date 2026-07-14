@@ -15,7 +15,7 @@ async def test_add_from_parsed_creates_transaction(
 ) -> None:
     parsed = ParsedTransaction(
         amount=800.0,
-        category="Еда",
+        category="продукты",
         type=TransactionType.expense,
         description="кофе",
     )
@@ -28,7 +28,7 @@ async def test_add_from_parsed_creates_transaction(
     # Matched an existing default category, did not create a duplicate.
     category = await CategoryRepository(session).get_by_id(tx.category_id, user.id)
     assert category is not None
-    assert category.name == "Еда"
+    assert category.name == "продукты"
 
 
 async def test_add_from_parsed_creates_custom_category(
@@ -57,12 +57,12 @@ async def test_change_category_reassigns(
 
     parsed = ParsedTransaction(
         amount=1500.0,
-        category="Транспорт",
+        category="транспорт",
         type=TransactionType.expense,
         description="такси",
     )
     tx = await service.add_from_parsed(user.id, parsed)
-    target = await repo.get_by_name(user.id, "Развлечения")
+    target = await repo.get_by_name(user.id, "развлечения")
     assert target is not None
 
     updated = await service.change_category(user.id, tx.id, target.id)

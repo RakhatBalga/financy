@@ -15,12 +15,15 @@ def format_amount(value: float, currency: str) -> str:
 
 def format_confirmation(parsed: ParsedTransaction, currency: str) -> str:
     kind = "Доход" if parsed.type.value == "income" else "Расход"
-    return (
+    text = (
         f"<b>{kind}</b>\n"
         f"Сумма: {format_amount(parsed.amount, currency)}\n"
         f"Категория: {parsed.category}\n"
-        f"Описание: {parsed.description}"
+        f"Описание: {parsed.description or '—'}"
     )
+    if parsed.confidence == "low":
+        text += "\n\n⚠️ Не уверен — проверь сумму и категорию."
+    return text
 
 
 def format_period_report(report: PeriodReport) -> str:

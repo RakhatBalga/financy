@@ -38,9 +38,9 @@ async def test_period_report_totals_and_percentages(
     session: AsyncSession, user: User
 ) -> None:
     base = datetime(2026, 7, 10, 12, 0, tzinfo=timezone.utc)
-    await _add_tx(session, user, "Еда", 3000.0, base)
-    await _add_tx(session, user, "Еда", 1000.0, base + timedelta(hours=1))
-    await _add_tx(session, user, "Транспорт", 1000.0, base + timedelta(hours=2))
+    await _add_tx(session, user, "продукты", 3000.0, base)
+    await _add_tx(session, user, "продукты", 1000.0, base + timedelta(hours=1))
+    await _add_tx(session, user, "транспорт", 1000.0, base + timedelta(hours=2))
 
     start = datetime(2026, 7, 1, tzinfo=timezone.utc)
     end = datetime(2026, 8, 1, tzinfo=timezone.utc)
@@ -50,7 +50,7 @@ async def test_period_report_totals_and_percentages(
 
     assert report.total == 5000.0
     # Ordered by total desc: Еда (4000, 80%) then Транспорт (1000, 20%).
-    assert [r.name for r in report.rows] == ["Еда", "Транспорт"]
+    assert [r.name for r in report.rows] == ["продукты", "транспорт"]
     assert report.rows[0].total == 4000.0
     assert report.rows[0].percent == 80.0
     assert report.rows[1].percent == 20.0
@@ -60,9 +60,9 @@ async def test_period_report_excludes_income(
     session: AsyncSession, user: User
 ) -> None:
     base = datetime(2026, 7, 10, tzinfo=timezone.utc)
-    await _add_tx(session, user, "Еда", 2000.0, base)
+    await _add_tx(session, user, "продукты", 2000.0, base)
     await _add_tx(
-        session, user, "Другое", 400000.0, base, TransactionType.income
+        session, user, "прочее", 400000.0, base, TransactionType.income
     )
 
     start = datetime(2026, 7, 1, tzinfo=timezone.utc)
@@ -95,8 +95,8 @@ async def test_weekly_digest_change_percent(
     prev_start, _ = periods.previous_week_range()
 
     # 1000 this week vs 500 last week -> +100%.
-    await _add_tx(session, user, "Еда", 1000.0, cur_start + timedelta(hours=1))
-    await _add_tx(session, user, "Еда", 500.0, prev_start + timedelta(hours=1))
+    await _add_tx(session, user, "продукты", 1000.0, cur_start + timedelta(hours=1))
+    await _add_tx(session, user, "продукты", 500.0, prev_start + timedelta(hours=1))
 
     digest = await AnalyticsService(session).weekly_digest(user)
 

@@ -15,10 +15,13 @@ class ParsedTransaction(BaseModel):
     fields as valid JSON.
     """
 
-    amount: float = Field(description="Positive amount of money, e.g. 800.0")
-    category: str = Field(description="Best-matching category name")
+    amount: float = Field(description="Positive amount in KZT, e.g. 800.0")
     type: TransactionType = Field(description="Either 'expense' or 'income'")
-    description: str = Field(description="Short human description of the item")
+    category: str = Field(description="Lowercase category name")
+    description: str = Field(description="1-4 word description, no amount")
+    confidence: str = Field(
+        default="high", description="'high' if unambiguous, else 'low'"
+    )
 
 
 class CategoryTotal(BaseModel):

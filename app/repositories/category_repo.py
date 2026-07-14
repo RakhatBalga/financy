@@ -7,17 +7,53 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import Category
 
-# Default categories mapped to their 50/30/20 bucket. Income is tracked by
-# transaction type, not category group, so no "income" bucket is needed here.
-DEFAULT_CATEGORY_GROUPS: dict[str, str] = {
-    "Еда": "needs",
-    "Транспорт": "needs",
-    "Жильё": "needs",
-    "Развлечения": "wants",
-    "Здоровье": "needs",
-    "Другое": "wants",
+# Full category taxonomy (matches the Gemini parser prompt) → 50/30/20 bucket.
+# "needs" = essentials, "wants" = discretionary. Income categories map to None
+# (they are excluded from the needs/wants math, which counts expenses only).
+CATEGORY_GROUPS: dict[str, str | None] = {
+    "продукты": "needs",
+    "еда вне дома": "wants",
+    "транспорт": "needs",
+    "такси": "wants",
+    "жильё": "needs",
+    "коммуналка": "needs",
+    "связь и интернет": "needs",
+    "здоровье": "needs",
+    "одежда": "wants",
+    "развлечения": "wants",
+    "подписки": "wants",
+    "образование": "needs",
+    "детям": "needs",
+    "подарки": "wants",
+    "путешествия": "wants",
+    "переводы": "wants",
+    "прочее": "wants",
+    "зарплата": None,
+    "доход прочее": None,
 }
-DEFAULT_CATEGORIES: tuple[str, ...] = tuple(DEFAULT_CATEGORY_GROUPS)
+
+# Categories pre-created on /start. A curated core subset — the rest are
+# created on demand when the parser first returns them.
+DEFAULT_CATEGORIES: tuple[str, ...] = (
+    "продукты",
+    "еда вне дома",
+    "транспорт",
+    "такси",
+    "жильё",
+    "коммуналка",
+    "связь и интернет",
+    "здоровье",
+    "развлечения",
+    "прочее",
+)
+
+
+def group_for(name: str) -> str | None:
+    """Return the 50/30/20 bucket for a category name (defaults to wants)."""
+    key = name.strip().casefold()
+    if key in CATEGORY_GROUPS:
+        return CATEGORY_GROUPS[key]
+    return "wants"
 
 
 class CategoryRepository:
@@ -33,9 +69,9 @@ class CategoryRepository:
                 user_id=user_id,
                 name=name,
                 is_default=True,
-                group_type=group,
+                group_type=group_for(name),
             )
-            for name, group in DEFAULT_CATEGORY_GROUPS.items()
+            for name in DEFAULT_CATEGORIES
         ]
         self._session.add_all(categories)
         await self._session.flush()
@@ -72,13 +108,17 @@ class CategoryRepository:
     async def get_or_create(self, user_id: int, name: str) -> Category:
         """Return an existing category by name or create a custom one.
 
-        Custom categories default to the "wants" bucket for 50/30/20.
+        The 50/30/20 bucket is derived from the taxonomy map (unknown names
+        fall back to "wants"), so auto-created categories are grouped too.
         """
         existing = await self.get_by_name(user_id, name)
         if existing is not None:
             return existing
         category = Category(
-            user_id=user_id, name=name, is_default=False, group_type="wants"
+            user_id=user_id,
+            name=name,
+            is_default=False,
+            group_type=group_for(name),
         )
         self._session.add(category)
         await self._session.flush()
