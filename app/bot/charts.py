@@ -25,39 +25,51 @@ _COLORS = [
 def pie_chart(report: PeriodReport) -> bytes | None:
     """Render a category pie chart for ``report`` and return PNG bytes.
 
-    Returns ``None`` when there is nothing to plot.
+    Category names live in a legend on the right (with their percent), so no
+    text overlaps the pie itself. Returns ``None`` when there is nothing to plot.
     """
     if not report.rows:
         return None
 
-    labels = [r.name for r in report.rows]
     values = [r.total for r in report.rows]
+    percents = [r.percent for r in report.rows]
     colors = [_COLORS[i % len(_COLORS)] for i in range(len(values))]
 
-    fig, ax = plt.subplots(figsize=(6, 6), dpi=120)
-    wedges, _texts, autotexts = ax.pie(
+    fig, ax = plt.subplots(figsize=(8.5, 5), dpi=120)
+    wedges, _texts = ax.pie(
         values,
-        labels=labels,
         colors=colors,
-        autopct=lambda pct: f"{pct:.0f}%",
         startangle=90,
-        pctdistance=0.78,
-        textprops={"fontsize": 11},
-    )
-    for t in autotexts:
-        t.set_color("white")
-        t.set_fontweight("bold")
-
-    ax.set_title(
-        f"{report.title}: {report.total:,.0f} {report.currency}".replace(",", " "),
-        fontsize=14,
-        fontweight="bold",
-        pad=16,
+        counterclock=False,
+        wedgeprops={"linewidth": 1.5, "edgecolor": "white"},
     )
     ax.axis("equal")
 
+    ax.set_title(
+        f"{report.title}: {report.total:,.0f} {report.currency}".replace(",", " "),
+        fontsize=15,
+        fontweight="bold",
+        loc="left",
+        pad=18,
+    )
+
+    # Legend on the right: "Категория — 51%", biggest first (rows are sorted).
+    legend_labels = [
+        f"{r.name}  —  {p:.0f}%" for r, p in zip(report.rows, percents)
+    ]
+    ax.legend(
+        wedges,
+        legend_labels,
+        loc="center left",
+        bbox_to_anchor=(1.02, 0.5),
+        frameon=False,
+        fontsize=12,
+        handlelength=1.2,
+        labelspacing=0.8,
+    )
+
     buffer = io.BytesIO()
-    fig.savefig(buffer, format="png", bbox_inches="tight")
+    fig.savefig(buffer, format="png", bbox_inches="tight", facecolor="white")
     plt.close(fig)
     buffer.seek(0)
     return buffer.getvalue()
