@@ -70,6 +70,22 @@ class AnalyticsService:
         start, end = periods.month_range()
         return await self.period_report(user, "Этот месяц", start, end)
 
+    async def income_month(self, user: User) -> PeriodReport:
+        """Income (not expenses) broken down by category for this month."""
+        start, end = periods.month_range()
+        return await self.period_report(
+            user, "Доходы за месяц", start, end, TransactionType.income
+        )
+
+    async def month_balance(self, user: User) -> tuple[PeriodReport, float]:
+        """Return ``(income_report, expense_total)`` for the current month."""
+        start, end = periods.month_range()
+        income = await self.income_month(user)
+        expense_total = await self._transactions.total_amount(
+            user.id, TransactionType.expense, start, end
+        )
+        return income, expense_total
+
     async def has_spending_today(self, user: User) -> bool:
         """True if the user logged at least one expense today."""
         start, end = periods.today_range()

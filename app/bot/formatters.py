@@ -56,6 +56,35 @@ def format_budget_alert(alert: BudgetAlert, currency: str) -> str:
     )
 
 
+def format_income_report(income: PeriodReport, expense_total: float) -> str:
+    """Render income breakdown for the month plus the net balance."""
+    currency = income.currency
+    balance = income.total - expense_total
+    sign = "🟢" if balance >= 0 else "🔴"
+
+    if not income.rows:
+        header = "💰 <b>Доходы за месяц</b>\nПоступлений пока нет."
+    else:
+        lines = [
+            "💰 <b>Доходы за месяц</b>",
+            f"Всего получено: {format_amount(income.total, currency)}",
+            "",
+            "<pre>",
+            f"{'Источник':<16}{'Сумма':>12}{'%':>6}",
+        ]
+        for row in income.rows:
+            amount = f"{row.total:,.0f}".replace(",", " ")
+            lines.append(f"{row.name[:16]:<16}{amount:>12}{row.percent:>5.0f}%")
+        lines.append("</pre>")
+        header = "\n".join(lines)
+
+    return (
+        f"{header}\n\n"
+        f"Расходы за месяц: {format_amount(expense_total, currency)}\n"
+        f"{sign} Баланс: {format_amount(balance, currency)}"
+    )
+
+
 def _verdict(actual_pct: float, target_pct: float, lower_is_better: bool) -> str:
     diff = actual_pct - target_pct
     if lower_is_better:

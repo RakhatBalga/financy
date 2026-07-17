@@ -9,6 +9,7 @@ from app.bot.handlers import (
     budget,
     chart,
     income,
+    incomes,
     manage,
     reports,
     start,
@@ -27,6 +28,7 @@ def build_router() -> Router:
     root = Router(name="root")
     root.include_router(start.router)
     root.include_router(reports.router)
+    root.include_router(incomes.router)
     root.include_router(budget.router)
     root.include_router(income.router)
     root.include_router(advice.router)

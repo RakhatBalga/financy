@@ -14,6 +14,7 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 BTN_AI = "🧠 Мнение ИИ"
 BTN_TODAY = "📅 Сегодня"
 BTN_MONTH = "📊 Месяц"
+BTN_INCOME = "💰 Доходы"
 BTN_CHART = "📈 График"
 
 
@@ -22,11 +23,8 @@ def main_reply_keyboard() -> ReplyKeyboardMarkup:
     return ReplyKeyboardMarkup(
         keyboard=[
             [KeyboardButton(text=BTN_AI)],
-            [
-                KeyboardButton(text=BTN_TODAY),
-                KeyboardButton(text=BTN_MONTH),
-                KeyboardButton(text=BTN_CHART),
-            ],
+            [KeyboardButton(text=BTN_TODAY), KeyboardButton(text=BTN_MONTH)],
+            [KeyboardButton(text=BTN_INCOME), KeyboardButton(text=BTN_CHART)],
         ],
         resize_keyboard=True,
         input_field_placeholder="Напиши трату, напр. «кофе 800»",

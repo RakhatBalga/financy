@@ -33,6 +33,7 @@ _BOT_COMMANDS = [
     BotCommand(command="today", description="Траты за сегодня"),
     BotCommand(command="week", description="Траты за неделю"),
     BotCommand(command="month", description="Траты за месяц"),
+    BotCommand(command="incomes", description="Доходы и баланс за месяц"),
     BotCommand(command="chart", description="График за месяц"),
     BotCommand(command="recent", description="Изменить/удалить траты"),
     BotCommand(command="setbudget", description="Лимит по категории"),
