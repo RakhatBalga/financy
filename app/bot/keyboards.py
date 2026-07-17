@@ -97,6 +97,7 @@ RECAT_PREFIX = "recat"
 SETCAT_PREFIX = "setcat"
 TXDEL_PREFIX = "txdel"
 TXEDIT_PREFIX = "txedit"
+CUSTOM_CAT_PREFIX = "custcat"
 
 
 def confirm_keyboard(transaction_id: int) -> InlineKeyboardMarkup:
@@ -122,7 +123,11 @@ def confirm_keyboard(transaction_id: int) -> InlineKeyboardMarkup:
 def category_picker_keyboard(
     transaction_id: int, categories: list[Category]
 ) -> InlineKeyboardMarkup:
-    """Grid of the user's categories for reassigning a transaction."""
+    """Grid of the user's categories for reassigning a transaction.
+
+    Always ends with a "type your own" option, since the wanted category may
+    not exist yet (e.g. it was never used by the free-text parser before).
+    """
     builder = InlineKeyboardBuilder()
     for category in categories:
         builder.button(
@@ -130,16 +135,26 @@ def category_picker_keyboard(
             callback_data=f"{SETCAT_PREFIX}:{transaction_id}:{category.id}",
         )
     builder.adjust(2)
+    builder.row(
+        InlineKeyboardButton(
+            text="✏️ Своя категория",
+            callback_data=f"{CUSTOM_CAT_PREFIX}:{transaction_id}",
+        )
+    )
     return builder.as_markup()
 
 
 def transaction_row_keyboard(transaction_id: int) -> InlineKeyboardMarkup:
-    """Edit-amount / delete buttons shown under each recent transaction."""
+    """Edit-amount / change-category / delete buttons under a recent transaction."""
     builder = InlineKeyboardBuilder()
     builder.row(
         InlineKeyboardButton(
             text="✏️ Сумма",
             callback_data=f"{TXEDIT_PREFIX}:{transaction_id}",
+        ),
+        InlineKeyboardButton(
+            text="🏷 Категория",
+            callback_data=f"{RECAT_PREFIX}:{transaction_id}",
         ),
         InlineKeyboardButton(
             text="🗑 Удалить",

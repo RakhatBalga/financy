@@ -15,6 +15,7 @@ from app.bot.formatters import (
     format_transaction_line,
 )
 from app.bot.keyboards import (
+    CUSTOM_CAT_PREFIX,
     MENU_BUTTONS,
     RESET_PREFIX,
     TXDEL_PREFIX,
@@ -22,6 +23,7 @@ from app.bot.keyboards import (
     reset_confirm_keyboard,
     transaction_row_keyboard,
 )
+from app.repositories.category_repo import CategoryRepository
 from app.repositories.transaction_repo import TransactionRepository
 from app.services.transaction_service import TransactionService
 from app.services.user_service import UserService
@@ -31,6 +33,12 @@ router = Router(name="manage")
 
 class EditAmount(StatesGroup):
     """Waiting for the user to type a new amount for a transaction."""
+
+    waiting = State()
+
+
+class EditCategory(StatesGroup):
+    """Waiting for the user to type a custom category name."""
 
     waiting = State()
 
@@ -128,6 +136,59 @@ async def on_edit_amount(
     await message.answer(
         f"✅ Сумма обновлена: {format_amount(amount, user.currency)}"
     )
+
+
+@router.callback_query(F.data.startswith(f"{CUSTOM_CAT_PREFIX}:"))
+async def on_custom_category_start(
+    callback: CallbackQuery, state: FSMContext
+) -> None:
+    assert callback.data is not None
+    transaction_id = int(callback.data.split(":")[1])
+    await state.set_state(EditCategory.waiting)
+    await state.update_data(transaction_id=transaction_id)
+    await callback.answer()
+    if isinstance(callback.message, Message):
+        await callback.message.answer(
+            "Напиши название категории (например: депозит, спорт):"
+        )
+
+
+@router.message(
+    StateFilter(EditCategory.waiting),
+    F.text,
+    ~F.text.startswith("/"),
+    ~F.text.in_(MENU_BUTTONS),
+)
+async def on_custom_category_name(
+    message: Message, state: FSMContext, session: AsyncSession
+) -> None:
+    assert message.from_user is not None and message.text is not None
+
+    name = message.text.strip()
+    data = await state.get_data()
+    transaction_id = int(data["transaction_id"])
+    await state.clear()
+
+    if not name or len(name) > 32:
+        await message.answer(
+            "Название должно быть короче 32 символов. Открой /recent и попробуй снова."
+        )
+        return
+
+    user = await UserService(session).get(message.from_user.id)
+    if user is None:
+        await message.answer("Сначала выполни /start.")
+        return
+
+    category = await CategoryRepository(session).get_or_create(user.id, name)
+    updated = await TransactionService(session).change_category(
+        user.id, transaction_id, category.id
+    )
+    if updated is None:
+        await message.answer("Не удалось изменить категорию.")
+        return
+
+    await message.answer(f"✅ Категория изменена: {category.name}")
 
 
 @router.message(Command("reset"))
