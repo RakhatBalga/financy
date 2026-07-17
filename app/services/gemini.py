@@ -26,12 +26,13 @@ log = structlog.get_logger(__name__)
 T = TypeVar("T", bound=BaseModel)
 
 # Tried in order after the configured model, if that one keeps failing.
-# All lightweight flash variants — unlikely to all be overloaded at once.
+# Lightweight flash variants + "-latest" aliases (future-proof: a retired ID
+# just 404s and is skipped). Unlikely to all be overloaded at once.
 _FALLBACK_MODELS: tuple[str, ...] = (
-    "gemini-2.0-flash",
     "gemini-2.5-flash-lite",
-    "gemini-2.0-flash-lite",
     "gemini-flash-latest",
+    "gemini-flash-lite-latest",
+    "gemini-2.5-pro",
 )
 # One try per model so a 503 cascades quickly through the list instead of
 # making the user wait on repeated backoffs.
@@ -50,19 +51,28 @@ def _models(primary: str | None) -> list[str]:
     return [first, *[m for m in _FALLBACK_MODELS if m != first]]
 
 
+def _status_code(exc: Exception) -> int | None:
+    return getattr(exc, "status_code", None)
+
+
 def _is_retryable(exc: Exception) -> bool:
     """503 (overloaded) and 429 (rate limit) are worth retrying."""
     if isinstance(exc, genai_errors.ServerError):  # 5xx
         return True
     if isinstance(exc, genai_errors.ClientError):
-        return getattr(exc, "status_code", None) == 429
+        return _status_code(exc) == 429
     return False
 
 
 async def _generate(
     contents: str, config: types.GenerateContentConfig, primary: str | None
 ) -> types.GenerateContentResponse:
-    """Call the API, retrying transient errors across primary + fallback models."""
+    """Call the API, cascading across primary + fallback models.
+
+    On an overloaded/rate-limited model (503/429) it backs off and retries; on
+    a retired/unknown model (404) it skips to the next without failing; other
+    client errors (bad request, auth) surface immediately.
+    """
     last_exc: Exception | None = None
     for model in _models(primary):
         for attempt in range(_MAX_ATTEMPTS_PER_MODEL):
@@ -71,9 +81,13 @@ async def _generate(
                     model=model, contents=contents, config=config
                 )
             except Exception as exc:  # noqa: BLE001 - classified below
+                last_exc = exc
+                if _status_code(exc) == 404:
+                    # Model retired/unknown — skip to the next one, don't abort.
+                    log.warning("gemini_model_unavailable", model=model)
+                    break
                 if not _is_retryable(exc):
                     raise
-                last_exc = exc
                 log.warning(
                     "gemini_retry",
                     model=model,
