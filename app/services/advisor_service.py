@@ -13,6 +13,7 @@ import structlog
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import TransactionType, User
+from app.repositories.category_repo import CategoryRepository
 from app.repositories.transaction_repo import TransactionRepository
 from app.services import benchmarks, gemini, periods
 from app.services.analytics_service import AnalyticsService
@@ -39,6 +40,10 @@ class RuleBreakdown:
     # True if `income` is the sum of income actually logged this month;
     # False if it fell back to the declared /income baseline.
     income_is_actual: bool
+    # Realistic reallocation of what's left after fixed obligations (needs),
+    # split 30:20 between wants and savings — the "gramotno" plan.
+    wants_ideal: float
+    savings_ideal: float
 
 
 _ADVICE_SYSTEM = """
@@ -53,9 +58,21 @@ _ADVICE_SYSTEM = """
 2-3 предложения: доход, расходы, баланс. Честная и спокойная оценка ситуации.
 
 <b>Что важно</b>
-4-6 конкретных рекомендаций, каждая с новой строки начинается с "• ".
-В каждой — конкретная категория и сумма из сводки, и что именно сделать.
-Сортируй по важности: сначала самое влияющее на баланс.
+3-5 конкретных рекомендаций (не больше, не заполняй список ради количества —
+лучше 3 сильных пункта, чем 5 с натяжкой), каждая с новой строки начинается
+с "• ". В каждой — конкретная категория и сумма из сводки, и что именно сделать.
+Сортируй по важности: сначала самое влияющее на баланс. Не предлагай урезать
+категории, которые и так уже минимальны (несколько сотен-тысяч тенге) — это
+не решает проблему, только создаёт видимость действия.
+
+<b>Как можно было бы потратить грамотнее</b>
+В сводке есть "план после обязательств": сколько разумно тратить на хотелки
+и сколько откладывать, если оставить обязательные платежи как есть. Сравни
+факт с этим планом: сколько ушло на хотелки по факту vs сколько можно было
+(с разбивкой по 2-3 самым крупным категориям хотелок), и сколько реально
+отложилось vs сколько могло бы. Покажи расчёт живо: "вместо X ₸ на Y ты мог(ла)
+отложить/потратить на Z". Если факт близок к плану — честно похвали, не выдумывай
+проблему.
 
 <b>Следующий шаг</b>
 Одно конкретное действие на этот месяц, с ориентиром в тенге.
@@ -73,13 +90,30 @@ _ADVICE_SYSTEM = """
 """.strip()
 
 
+# Telegram's HTML parser only understands a small tag set (b, i, u, s, a,
+# code, pre, span, blockquote) — anything else (p, ul, li, div, br, h1, ...)
+# makes the whole message fail to send. Strip/convert those before sending.
+_TAG_TO_NEWLINE = re.compile(r"</?(p|div|ul|ol|br|h[1-6])\b[^>]*>", re.IGNORECASE)
+_LI_OPEN = re.compile(r"<li\b[^>]*>", re.IGNORECASE)
+_LI_CLOSE = re.compile(r"</li>", re.IGNORECASE)
+
+
 def _clean_markup(text: str) -> str:
     """Normalise the model's output to Telegram-HTML-friendly markup.
 
-    Converts markdown bold to ``<b>`` and unifies bullet markers to "• ".
+    Converts markdown bold to ``<b>``, unifies bullet markers to "• ", and
+    strips block-level HTML tags (``<p>``, ``<ul>``, ``<li>``, ...) that
+    Telegram's parser rejects, turning them into plain newlines/bullets.
     """
     text = re.sub(r"\*\*(.+?)\*\*", r"<b>\1</b>", text)
-    text = re.sub(r"(?m)^[ \t]*[*\-•][ \t]+", "• ", text)
+    text = _LI_OPEN.sub("• ", text)
+    text = _LI_CLOSE.sub("\n", text)
+    text = _TAG_TO_NEWLINE.sub("\n", text)
+    text = re.sub(r"(?m)^[ \t]*[*\-][ \t]+", "• ", text)
+    # A <li> already followed by the model's own "• " leaves "• • " — collapse it.
+    text = re.sub(r"•\s*•\s*", "• ", text)
+    # Collapse runs of blank lines left behind by the tag stripping.
+    text = re.sub(r"\n{3,}", "\n\n", text)
     return text.strip()
 
 
@@ -89,6 +123,7 @@ class AdvisorService:
     def __init__(self, session: AsyncSession) -> None:
         self._session = session
         self._transactions = TransactionRepository(session)
+        self._categories = CategoryRepository(session)
         self._analytics = AnalyticsService(session)
 
     async def fifty_thirty_twenty(self, user: User) -> RuleBreakdown | None:
@@ -117,6 +152,19 @@ class AdvisorService:
         wants = groups.get("wants", 0.0)
         savings = income - (needs + wants)
 
+        # Needs/obligations are fixed (rent, debt, family support) — the
+        # realistic plan reallocates what's left after them, not the whole
+        # income, since a 50%-needs target is moot once obligations exceed it.
+        remaining_after_needs = income - needs
+        if remaining_after_needs > 0:
+            wants_ideal = remaining_after_needs * (
+                TARGET_WANTS / (TARGET_WANTS + TARGET_SAVINGS)
+            )
+            savings_ideal = remaining_after_needs - wants_ideal
+        else:
+            wants_ideal = 0.0
+            savings_ideal = remaining_after_needs  # deficit, negative
+
         return RuleBreakdown(
             income=income,
             needs=needs,
@@ -126,6 +174,8 @@ class AdvisorService:
             wants_pct=wants / income * 100.0,
             savings_pct=savings / income * 100.0,
             income_is_actual=income_is_actual,
+            wants_ideal=wants_ideal,
+            savings_ideal=savings_ideal,
         )
 
     async def monthly_advice(self, user: User) -> str:
@@ -165,18 +215,31 @@ class AdvisorService:
             f"({'профицит' if balance >= 0 else 'дефицит'})."
         )
 
+        category_groups = {
+            c.name: c.group_type for c in await self._categories.list_for_user(user.id)
+        }
         lines += [f"Расходы за месяц: {total:.0f} ₸.", "Категории расходов:"]
         for name, amount in rows:
             share = amount / total * 100.0 if total else 0.0
-            lines.append(f"- {name}: {amount:.0f} ₸ ({share:.0f}%)")
+            tag = " [хотелка]" if category_groups.get(name) == "wants" else ""
+            lines.append(f"- {name}: {amount:.0f} ₸ ({share:.0f}%){tag}")
 
         rule = await self.fifty_thirty_twenty(user)
         if rule is not None:
             lines.append(
                 f"Доход: {rule.income:.0f} ₸. "
-                f"Нужное {rule.needs_pct:.0f}% (цель 50%), "
-                f"хотелки {rule.wants_pct:.0f}% (цель 30%), "
-                f"остаётся {rule.savings_pct:.0f}% (цель 20%)."
+                f"Нужное (обязательства) {rule.needs:.0f} ₸ ({rule.needs_pct:.0f}%), "
+                f"хотелки {rule.wants:.0f} ₸ ({rule.wants_pct:.0f}%), "
+                f"осталось по факту {rule.savings:.0f} ₸ ({rule.savings_pct:.0f}%)."
+            )
+            lines.append(
+                "План после обязательств (нужное менять нельзя, это "
+                f"фиксированные платежи): из оставшихся "
+                f"{rule.income - rule.needs:.0f} ₸ разумно направить "
+                f"~{rule.wants_ideal:.0f} ₸ на хотелки и "
+                f"~{rule.savings_ideal:.0f} ₸ отложить/накопить. "
+                f"По факту на хотелки ушло {rule.wants:.0f} ₸, "
+                f"отложилось фактически {rule.savings:.0f} ₸."
             )
 
         anomalies = await self._analytics.detect_anomalies(user)

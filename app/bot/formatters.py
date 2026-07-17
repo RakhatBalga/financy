@@ -93,9 +93,10 @@ def _verdict(actual_pct: float, target_pct: float, lower_is_better: bool) -> str
 
 
 def format_rule(rule: RuleBreakdown, currency: str) -> str:
-    """Render the 50/30/20 breakdown."""
+    """Render the 50/30/20 breakdown, plus a realistic plan for what's left
+    after fixed obligations (needs) — grounded advice, not just a % target."""
     source = "получено в этом месяце" if rule.income_is_actual else "ожидаемый доход"
-    return (
+    text = (
         "📊 <b>Правило 50/30/20</b> (доход "
         f"{format_amount(rule.income, currency)}, {source})\n"
         f"Нужное: {format_amount(rule.needs, currency)} "
@@ -108,6 +109,18 @@ def format_rule(rule: RuleBreakdown, currency: str) -> str:
         f"({rule.savings_pct:.0f}% / цель 20%) — "
         f"{_verdict(rule.savings_pct, 20, lower_is_better=False)}"
     )
+
+    remaining = rule.income - rule.needs
+    if remaining > 0:
+        text += (
+            "\n\n💡 <b>Грамотный план после обязательств</b>\n"
+            f"После нужного остаётся {format_amount(remaining, currency)}. "
+            f"Разумно: ~{format_amount(rule.wants_ideal, currency)} на хотелки, "
+            f"~{format_amount(rule.savings_ideal, currency)} отложить.\n"
+            f"По факту: на хотелки {format_amount(rule.wants, currency)}, "
+            f"отложилось {format_amount(rule.savings, currency)}."
+        )
+    return text
 
 
 def format_anomalies(anomalies: list[dict[str, object]], currency: str) -> str:
