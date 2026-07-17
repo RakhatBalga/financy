@@ -55,3 +55,18 @@ class UserService:
         await self._users.set_income(user, monthly_income)
         await self._session.commit()
         log.info("income_set", user_id=user.id)
+
+    async def set_living_situation(
+        self, user: User, *, housing_is_free: bool, food_is_free: bool
+    ) -> None:
+        """Store the onboarding answers (housing/food paid for by the user or not)."""
+        await self._users.set_living_situation(
+            user, housing_is_free=housing_is_free, food_is_free=food_is_free
+        )
+        await self._session.commit()
+        log.info(
+            "living_situation_set",
+            user_id=user.id,
+            housing_is_free=housing_is_free,
+            food_is_free=food_is_free,
+        )

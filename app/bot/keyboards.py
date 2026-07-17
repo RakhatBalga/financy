@@ -23,6 +23,41 @@ MENU_BUTTONS: frozenset[str] = frozenset(
     {BTN_AI, BTN_TODAY, BTN_MONTH, BTN_INCOME, BTN_CHART}
 )
 
+# Onboarding: housing/food cost questions asked once on first /start.
+HOUSING_PREFIX = "housing"
+FOOD_PREFIX = "food"
+
+
+def housing_question_keyboard() -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    builder.row(
+        InlineKeyboardButton(
+            text="🏠 Бесплатно (с родителями/семьёй)",
+            callback_data=f"{HOUSING_PREFIX}:1",
+        )
+    )
+    builder.row(
+        InlineKeyboardButton(
+            text="💳 Плачу сам(а)", callback_data=f"{HOUSING_PREFIX}:0"
+        )
+    )
+    return builder.as_markup()
+
+
+def food_question_keyboard() -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    builder.row(
+        InlineKeyboardButton(
+            text="🍽 В основном бесплатно (дома)", callback_data=f"{FOOD_PREFIX}:1"
+        )
+    )
+    builder.row(
+        InlineKeyboardButton(
+            text="💳 Плачу сам(а)/трачу на еду", callback_data=f"{FOOD_PREFIX}:0"
+        )
+    )
+    return builder.as_markup()
+
 
 def main_reply_keyboard() -> ReplyKeyboardMarkup:
     """Always-visible keyboard with the AI-opinion button and quick reports."""

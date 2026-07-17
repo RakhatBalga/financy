@@ -39,3 +39,11 @@ class UserRepository:
         """Persist the user's declared monthly income."""
         user.monthly_income = monthly_income
         await self._session.flush()
+
+    async def set_living_situation(
+        self, user: User, *, housing_is_free: bool, food_is_free: bool
+    ) -> None:
+        """Persist the onboarding answers about housing/food costs."""
+        user.housing_is_free = housing_is_free
+        user.food_is_free = food_is_free
+        await self._session.flush()

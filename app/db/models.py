@@ -42,6 +42,11 @@ class User(Base):
     monthly_income: Mapped[float | None] = mapped_column(
         Numeric(14, 2), nullable=True
     )
+    # Living situation, asked once on /start: True = free (with parents/family),
+    # False = pays for it themselves, NULL = not answered yet. Used so the AI's
+    # hypothetical budget doesn't invent rent/food money the user doesn't spend.
+    housing_is_free: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    food_is_free: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
