@@ -97,9 +97,22 @@ async def cmd_advice(message: Message, session: AsyncSession) -> None:
             "добавлю разбор по правилу 50/30/20."
         )
 
-    text = "\n\n".join(parts)
-    try:
-        await message.answer(text)
-    except TelegramBadRequest:
-        # AI output produced HTML Telegram couldn't parse — resend as plain text.
-        await message.answer(html.unescape(re.sub(r"<[^>]+>", "", text)))
+    # Send each block as its own message so a long AI review can't push the
+    # whole thing past Telegram's 4096-char limit.
+    for part in parts:
+        await _safe_send(message, part)
+
+
+def _plain(text: str) -> str:
+    """Strip HTML tags for the plain-text fallback."""
+    return html.unescape(re.sub(r"<[^>]+>", "", text))
+
+
+async def _safe_send(message: Message, text: str) -> None:
+    """Send text in <=4000-char chunks, falling back to plain on HTML errors."""
+    for i in range(0, len(text), 4000):
+        chunk = text[i : i + 4000]
+        try:
+            await message.answer(chunk)
+        except TelegramBadRequest:
+            await message.answer(_plain(chunk))
