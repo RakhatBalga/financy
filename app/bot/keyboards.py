@@ -17,6 +17,12 @@ BTN_MONTH = "📊 Месяц"
 BTN_INCOME = "💰 Доходы"
 BTN_CHART = "📈 График"
 
+# All reply-keyboard labels — FSM "waiting for a number" states exclude these so
+# a button press is never mistaken for the typed amount.
+MENU_BUTTONS: frozenset[str] = frozenset(
+    {BTN_AI, BTN_TODAY, BTN_MONTH, BTN_INCOME, BTN_CHART}
+)
+
 
 def main_reply_keyboard() -> ReplyKeyboardMarkup:
     """Always-visible keyboard with the AI-opinion button and quick reports."""

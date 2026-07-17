@@ -6,6 +6,7 @@ anomalies and subscriptions) into a few concrete, human recommendations.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 
 import structlog
@@ -41,25 +42,45 @@ class RuleBreakdown:
 
 
 _ADVICE_SYSTEM = """
-Ты — финансовый коуч для пользователя из Казахстана. На вход — сводка расходов
-за месяц (категории, доли, доход, правило 50/30/20, аномалии, подписки).
+Ты — внимательный финансовый коуч для пользователя из Казахстана. На вход —
+подробная сводка за месяц (доходы по источникам, расходы по категориям с долями,
+баланс, правило 50/30/20, аномалии, подписки, сравнение со средним по РК).
 
-Дай ровно 3 коротких конкретных совета на русском, по одному в строке,
-каждый начинается с "• ". Опирайся на цифры из сводки, называй конкретные
-категории и суммы. Тон — дружелюбный, уважительный, без морализаторства.
-Не выдумывай данных, которых нет в сводке. Валюта — тенге (₸).
+Дай РАЗВЁРНУТЫЙ разбор на русском в таком формате (используй HTML-теги
+<b>...</b> для заголовков, без markdown):
 
-ВАЖНО про обязательства:
-- "помощь семье" и "кредиты и рассрочка" — это ОБЯЗАТЕЛЬСТВА, а не хотелки.
-  НЕ предлагай "просто сократить" помощь родным или перестать платить долг.
-- Для долгов уместны советы: рефинансирование/объединение рассрочек, досрочное
+<b>Итог</b>
+2-3 предложения: доход, расходы, баланс. Честная и спокойная оценка ситуации.
+
+<b>Что важно</b>
+4-6 конкретных рекомендаций, каждая с новой строки начинается с "• ".
+В каждой — конкретная категория и сумма из сводки, и что именно сделать.
+Сортируй по важности: сначала самое влияющее на баланс.
+
+<b>Следующий шаг</b>
+Одно конкретное действие на этот месяц, с ориентиром в тенге.
+
+Правила:
+- Опирайся ТОЛЬКО на цифры из сводки, ничего не выдумывай. Валюта — тенге (₸).
+- "помощь семье" и "кредиты и рассрочка" — это ОБЯЗАТЕЛЬСТВА, не хотелки.
+  НЕ предлагай сократить помощь родным или перестать платить долг.
+- Для долгов уместны: рефинансирование/объединение рассрочек, досрочное
   закрытие самой дорогой, план погашения.
-- Экономию ищи прежде всего в дискреционных тратах: еда вне дома, развлечения,
-  подписки, такси, одежда, подарки.
-- Если обязательные траты (нужное + долги + помощь семье) превышают доход,
-  честно и спокойно скажи об этом и предложи реалистичные шаги, включая
-  возможность дополнительного дохода. Без чувства вины.
+- Экономию ищи в дискреционных тратах: еда вне дома, развлечения, подписки,
+  такси, одежда, подарки.
+- Если обязательные траты превышают доход — скажи честно и спокойно, предложи
+  реалистичные шаги, включая дополнительный доход. Без чувства вины и морализаторства.
 """.strip()
+
+
+def _clean_markup(text: str) -> str:
+    """Normalise the model's output to Telegram-HTML-friendly markup.
+
+    Converts markdown bold to ``<b>`` and unifies bullet markers to "• ".
+    """
+    text = re.sub(r"\*\*(.+?)\*\*", r"<b>\1</b>", text)
+    text = re.sub(r"(?m)^[ \t]*[*\-•][ \t]+", "• ", text)
+    return text.strip()
 
 
 class AdvisorService:
@@ -108,14 +129,16 @@ class AdvisorService:
         )
 
     async def monthly_advice(self, user: User) -> str:
-        """Generate 3 concrete recommendations from this month's data (AI)."""
+        """Generate a detailed month review from this month's data (AI)."""
         summary = await self._build_summary(user)
         if summary is None:
             return "Пока мало данных за месяц — запиши несколько трат, и я дам совет."
 
         advice = await gemini.generate_text(summary, _ADVICE_SYSTEM)
         log.info("monthly_advice_generated", user_id=user.id)
-        return advice or "Не получилось сформировать совет, попробуй позже."
+        if not advice:
+            return "Не получилось сформировать совет, попробуй позже."
+        return _clean_markup(advice)
 
     async def _build_summary(self, user: User) -> str | None:
         """Assemble a compact plain-text summary fed to the model."""
@@ -127,7 +150,22 @@ class AdvisorService:
             return None
 
         total = sum(a for _, a in rows)
-        lines = [f"Расходы за месяц: {total:.0f} ₸.", "Категории:"]
+
+        # Income sources + balance for the month.
+        income_report, expense_total = await self._analytics.month_balance(user)
+        lines: list[str] = []
+        if income_report.rows:
+            lines.append("Доходы за месяц по источникам:")
+            for r in income_report.rows:
+                lines.append(f"- {r.name}: {r.total:.0f} ₸")
+            lines.append(f"Всего доходов: {income_report.total:.0f} ₸.")
+        balance = income_report.total - expense_total
+        lines.append(
+            f"Баланс за месяц: {balance:.0f} ₸ "
+            f"({'профицит' if balance >= 0 else 'дефицит'})."
+        )
+
+        lines += [f"Расходы за месяц: {total:.0f} ₸.", "Категории расходов:"]
         for name, amount in rows:
             share = amount / total * 100.0 if total else 0.0
             lines.append(f"- {name}: {amount:.0f} ₸ ({share:.0f}%)")
@@ -152,9 +190,21 @@ class AdvisorService:
         subs = await self._analytics.detect_subscriptions(user)
         if subs:
             sub_total = sum(float(s["amount"]) for s in subs)  # type: ignore[arg-type]
+            names = ", ".join(str(s["description"]) for s in subs[:5])
             lines.append(
-                f"Похоже на подписки/регулярные платежи на ~{sub_total:.0f} ₸/мес."
+                f"Похоже на подписки/регулярные платежи на ~{sub_total:.0f} ₸/мес "
+                f"({names})."
             )
+
+        # Deviations from the KZ average (shares of spending).
+        bench = await self.benchmark(user)
+        deviations = [
+            f"{name}: {u:.0f}% vs средних {kz:.0f}%"
+            for name, u, kz in bench
+            if abs(u - kz) >= 7
+        ][:3]
+        if deviations:
+            lines.append("Отклонения от среднего по РК: " + "; ".join(deviations) + ".")
 
         return "\n".join(lines)
 

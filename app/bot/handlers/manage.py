@@ -15,6 +15,7 @@ from app.bot.formatters import (
     format_transaction_line,
 )
 from app.bot.keyboards import (
+    MENU_BUTTONS,
     TXDEL_PREFIX,
     TXEDIT_PREFIX,
     transaction_row_keyboard,
@@ -86,7 +87,12 @@ async def on_edit_start(
         await callback.message.answer("Введи новую сумму числом (например 1200):")
 
 
-@router.message(StateFilter(EditAmount.waiting), F.text, ~F.text.startswith("/"))
+@router.message(
+    StateFilter(EditAmount.waiting),
+    F.text,
+    ~F.text.startswith("/"),
+    ~F.text.in_(MENU_BUTTONS),
+)
 async def on_edit_amount(
     message: Message, state: FSMContext, session: AsyncSession
 ) -> None:
@@ -95,7 +101,10 @@ async def on_edit_amount(
     try:
         amount = float(message.text.replace(" ", "").replace(",", "."))
     except ValueError:
-        await message.answer("Нужно число. Попробуй ещё раз или отправь /recent.")
+        await state.clear()
+        await message.answer(
+            "Это не похоже на сумму — отменил. Открой /recent и попробуй снова."
+        )
         return
 
     data = await state.get_data()

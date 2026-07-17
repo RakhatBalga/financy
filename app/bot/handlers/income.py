@@ -17,6 +17,7 @@ from aiogram.types import Message
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.bot.formatters import format_amount
+from app.bot.keyboards import MENU_BUTTONS
 from app.db.models import User
 from app.services.user_service import UserService
 
@@ -88,7 +89,10 @@ async def cmd_income(
 
 
 @router.message(
-    IncomeStates.waiting, F.text, ~F.text.startswith("/")
+    IncomeStates.waiting,
+    F.text,
+    ~F.text.startswith("/"),
+    ~F.text.in_(MENU_BUTTONS),
 )
 async def on_income_amount(
     message: Message, session: AsyncSession, state: FSMContext
@@ -97,7 +101,12 @@ async def on_income_amount(
 
     amount = _parse_amount(message.text)
     if amount is None:
-        await message.answer("Нужно число. Попробуй ещё раз или отправь /income.")
+        # Not a number — abandon the input rather than trapping the user.
+        await state.clear()
+        await message.answer(
+            "Это не похоже на сумму — отменил ввод дохода. "
+            "Задать можно так: <code>/income 400000</code>."
+        )
         return
 
     await state.clear()

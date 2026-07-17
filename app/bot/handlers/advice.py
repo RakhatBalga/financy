@@ -2,8 +2,12 @@
 
 from __future__ import annotations
 
+import html
+import re
+
 import structlog
 from aiogram import F, Router
+from aiogram.exceptions import TelegramBadRequest
 from aiogram.filters import Command
 from aiogram.types import Message
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -93,4 +97,9 @@ async def cmd_advice(message: Message, session: AsyncSession) -> None:
             "добавлю разбор по правилу 50/30/20."
         )
 
-    await message.answer("\n\n".join(parts))
+    text = "\n\n".join(parts)
+    try:
+        await message.answer(text)
+    except TelegramBadRequest:
+        # AI output produced HTML Telegram couldn't parse — resend as plain text.
+        await message.answer(html.unescape(re.sub(r"<[^>]+>", "", text)))
