@@ -60,21 +60,21 @@ class AnalyticsService:
 
     async def today(self, user: User) -> PeriodReport:
         start, end = periods.today_range()
-        return await self.period_report(user, "Сегодня", start, end)
+        return await self.period_report(user, "Бүгін", start, end)
 
     async def week(self, user: User) -> PeriodReport:
         start, end = periods.week_range()
-        return await self.period_report(user, "Эта неделя", start, end)
+        return await self.period_report(user, "Осы апта", start, end)
 
     async def month(self, user: User) -> PeriodReport:
         start, end = periods.month_range()
-        return await self.period_report(user, "Этот месяц", start, end)
+        return await self.period_report(user, "Осы ай", start, end)
 
     async def income_month(self, user: User) -> PeriodReport:
         """Income (not expenses) broken down by category for this month."""
         start, end = periods.month_range()
         return await self.period_report(
-            user, "Доходы за месяц", start, end, TransactionType.income
+            user, "Айлық кірістер", start, end, TransactionType.income
         )
 
     async def month_balance(self, user: User) -> tuple[PeriodReport, float]:

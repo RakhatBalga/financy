@@ -32,7 +32,7 @@ async def _require_user(message: Message, session: AsyncSession) -> User | None:
     assert message.from_user is not None
     user = await UserService(session).get(message.from_user.id)
     if user is None:
-        await message.answer("Сначала выполни /start.")
+        await message.answer("Алдымен /start басыңыз.")
     return user
 
 
@@ -44,9 +44,9 @@ async def cmd_rule(message: Message, session: AsyncSession) -> None:
     rule = await AdvisorService(session).fifty_thirty_twenty(user)
     if rule is None:
         await message.answer(
-            "Нужен доход. Просто запиши поступление, например "
-            "<i>зарплата 150000</i> или <i>стипендия 40000</i> — правило "
-            "пересчитается само. Либо задай ожидаемый: <code>/income 190000</code>."
+            "Кіріс керек. Жай түсімді жаз, мысалы "
+            "<i>жалақы 150000</i> немесе <i>стипендия 40000</i> — ереже "
+            "өзі қайта есептеледі. Немесе күтілетінін қой: <code>/income 190000</code>."
         )
         return
     await message.answer(format_rule(rule, user.currency))
@@ -60,7 +60,7 @@ async def cmd_benchmark(message: Message, session: AsyncSession) -> None:
     rows = await AdvisorService(session).benchmark(user)
     shares = await AnalyticsService(session).month_shares(user)
     if not shares:
-        await message.answer("Нет трат за месяц — не с чем сравнивать.")
+        await message.answer("Айда шығын жоқ — салыстыратын ештеңе жоқ.")
         return
     await message.answer(format_benchmark(rows))
 
@@ -93,8 +93,8 @@ async def cmd_advice(message: Message, session: AsyncSession) -> None:
 
     if rule is None:
         parts.append(
-            "💡 Подскажи доход командой <code>/income 400000</code> — "
-            "добавлю разбор по правилу 50/30/20."
+            "💡 Кірісті <code>/income 400000</code> командасымен көрсет — "
+            "50/30/20 ережесі бойынша талдау қосамын."
         )
 
     # Send each block as its own message so a long AI review can't push the

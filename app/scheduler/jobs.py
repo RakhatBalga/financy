@@ -17,8 +17,8 @@ from app.services.budget_service import BudgetService
 log = structlog.get_logger(__name__)
 
 _REMINDER_TEXT = (
-    "🌙 Не забудь записать траты за сегодня — просто напиши, например "
-    "<i>ужин 3500</i>."
+    "🌙 Бүгінгі шығындарды жазуды ұмытпа — жай жаз, мысалы "
+    "<i>кешкі ас 3500</i>."
 )
 
 

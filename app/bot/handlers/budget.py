@@ -15,8 +15,8 @@ from app.services.user_service import UserService
 router = Router(name="budget")
 
 _USAGE = (
-    "Использование: <code>/setbudget &lt;категория&gt; &lt;сумма&gt;</code>\n"
-    "Например: <code>/setbudget Еда 120000</code>"
+    "Қолдану: <code>/setbudget &lt;санат&gt; &lt;сома&gt;</code>\n"
+    "Мысалы: <code>/setbudget азық-түлік 120000</code>"
 )
 
 
@@ -28,7 +28,7 @@ async def cmd_setbudget(
 
     user = await UserService(session).get(message.from_user.id)
     if user is None:
-        await message.answer("Сначала выполни /start.")
+        await message.answer("Алдымен /start басыңыз.")
         return
 
     if not command.args:
@@ -45,7 +45,7 @@ async def cmd_setbudget(
     try:
         amount = float(raw_amount.replace(",", ".").replace(" ", ""))
     except ValueError:
-        await message.answer("Сумма должна быть числом.\n\n" + _USAGE)
+        await message.answer("Сома сан болуы керек.\n\n" + _USAGE)
         return
 
     try:
@@ -55,10 +55,10 @@ async def cmd_setbudget(
             monthly_limit=amount,
         )
     except ValueError:
-        await message.answer("Сумма должна быть больше нуля.")
+        await message.answer("Сома нөлден үлкен болуы керек.")
         return
 
     await message.answer(
-        f"✅ Лимит на месяц для «{resolved}» установлен: "
+        f"✅ «{resolved}» үшін айлық лимит қойылды: "
         f"{format_amount(amount, user.currency)}"
     )

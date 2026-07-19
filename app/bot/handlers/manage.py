@@ -48,12 +48,12 @@ async def cmd_recent(message: Message, session: AsyncSession) -> None:
     assert message.from_user is not None
     user = await UserService(session).get(message.from_user.id)
     if user is None:
-        await message.answer("Сначала выполни /start.")
+        await message.answer("Алдымен /start басыңыз.")
         return
 
     transactions = await TransactionRepository(session).list_recent(user.id, 10)
     if not transactions:
-        await message.answer("Пока нет записанных трат.")
+        await message.answer("Әзірге жазылған шығын жоқ.")
         return
 
     await message.answer(format_recent(transactions, user.currency))
@@ -71,17 +71,17 @@ async def on_delete(callback: CallbackQuery, session: AsyncSession) -> None:
 
     user = await UserService(session).get(callback.from_user.id)
     if user is None:
-        await callback.answer("Сначала выполни /start.", show_alert=True)
+        await callback.answer("Алдымен /start басыңыз.", show_alert=True)
         return
 
     deleted = await TransactionService(session).delete(user.id, transaction_id)
     if not deleted:
-        await callback.answer("Не удалось удалить.", show_alert=True)
+        await callback.answer("Жою мүмкін болмады.", show_alert=True)
         return
 
-    await callback.answer("Удалено 🗑")
+    await callback.answer("Жойылды 🗑")
     if isinstance(callback.message, Message):
-        await callback.message.edit_text("<s>операция удалена</s>")
+        await callback.message.edit_text("<s>операция жойылды</s>")
 
 
 @router.callback_query(F.data.startswith(f"{TXEDIT_PREFIX}:"))
@@ -94,7 +94,7 @@ async def on_edit_start(
     await state.update_data(transaction_id=transaction_id)
     await callback.answer()
     if isinstance(callback.message, Message):
-        await callback.message.answer("Введи новую сумму числом (например 1200):")
+        await callback.message.answer("Жаңа соманы санмен енгіз (мысалы 1200):")
 
 
 @router.message(
@@ -113,7 +113,7 @@ async def on_edit_amount(
     except ValueError:
         await state.clear()
         await message.answer(
-            "Это не похоже на сумму — отменил. Открой /recent и попробуй снова."
+            "Бұл сомаға ұқсамайды — болдырмадым. /recent ашып қайта көр."
         )
         return
 
@@ -123,18 +123,18 @@ async def on_edit_amount(
 
     user = await UserService(session).get(message.from_user.id)
     if user is None:
-        await message.answer("Сначала выполни /start.")
+        await message.answer("Алдымен /start басыңыз.")
         return
 
     updated = await TransactionService(session).update_amount(
         user.id, transaction_id, amount
     )
     if updated is None:
-        await message.answer("Не удалось обновить сумму.")
+        await message.answer("Соманы жаңарту мүмкін болмады.")
         return
 
     await message.answer(
-        f"✅ Сумма обновлена: {format_amount(amount, user.currency)}"
+        f"✅ Сома жаңартылды: {format_amount(amount, user.currency)}"
     )
 
 
@@ -149,7 +149,7 @@ async def on_custom_category_start(
     await callback.answer()
     if isinstance(callback.message, Message):
         await callback.message.answer(
-            "Напиши название категории (например: депозит, спорт):"
+            "Санат атауын жаз (мысалы: депозит, спорт):"
         )
 
 
@@ -171,13 +171,13 @@ async def on_custom_category_name(
 
     if not name or len(name) > 32:
         await message.answer(
-            "Название должно быть короче 32 символов. Открой /recent и попробуй снова."
+            "Атау 32 таңбадан қысқа болуы керек. /recent ашып қайта көр."
         )
         return
 
     user = await UserService(session).get(message.from_user.id)
     if user is None:
-        await message.answer("Сначала выполни /start.")
+        await message.answer("Алдымен /start басыңыз.")
         return
 
     category = await CategoryRepository(session).get_or_create(user.id, name)
@@ -185,10 +185,10 @@ async def on_custom_category_name(
         user.id, transaction_id, category.id
     )
     if updated is None:
-        await message.answer("Не удалось изменить категорию.")
+        await message.answer("Санатты өзгерту мүмкін болмады.")
         return
 
-    await message.answer(f"✅ Категория изменена: {category.name}")
+    await message.answer(f"✅ Санат өзгертілді: {category.name}")
 
 
 @router.message(Command("reset"))
@@ -196,21 +196,21 @@ async def cmd_reset(message: Message, session: AsyncSession) -> None:
     assert message.from_user is not None
     user = await UserService(session).get(message.from_user.id)
     if user is None:
-        await message.answer("Сначала выполни /start.")
+        await message.answer("Алдымен /start басыңыз.")
         return
 
     await message.answer(
-        "⚠️ <b>Удалить ВСЕ траты, доходы и бюджеты?</b>\n"
-        "Это действие необратимо. Профиль, категории и доход останутся.",
+        "⚠️ <b>БАРЛЫҚ шығын, кіріс пен бюджетті жою керек пе?</b>\n"
+        "Бұл әрекетті қайтару мүмкін емес. Профиль, санаттар мен кіріс қалады.",
         reply_markup=reset_confirm_keyboard(),
     )
 
 
 @router.callback_query(F.data == f"{RESET_PREFIX}:cancel")
 async def on_reset_cancel(callback: CallbackQuery) -> None:
-    await callback.answer("Отменено")
+    await callback.answer("Болдырылмады")
     if isinstance(callback.message, Message):
-        await callback.message.edit_text("Отменено — данные не тронуты.")
+        await callback.message.edit_text("Болдырылмады — деректер өзгертілмеді.")
 
 
 @router.callback_query(F.data == f"{RESET_PREFIX}:confirm")
@@ -218,14 +218,14 @@ async def on_reset_confirm(callback: CallbackQuery, session: AsyncSession) -> No
     assert callback.from_user is not None
     user = await UserService(session).get(callback.from_user.id)
     if user is None:
-        await callback.answer("Сначала выполни /start.", show_alert=True)
+        await callback.answer("Алдымен /start басыңыз.", show_alert=True)
         return
 
     tx_count, budget_count = await TransactionService(session).reset_all(user.id)
 
-    await callback.answer("Удалено")
+    await callback.answer("Жойылды")
     if isinstance(callback.message, Message):
         await callback.message.edit_text(
-            f"🗑 Удалено: {tx_count} операций, {budget_count} бюджетов.\n"
-            "Можно начинать заново — просто пиши траты обычным текстом."
+            f"🗑 Жойылды: {tx_count} операция, {budget_count} бюджет.\n"
+            "Қайта бастауға болады — шығындарды жай мәтінмен жаз."
         )

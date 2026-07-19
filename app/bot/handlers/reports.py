@@ -20,7 +20,7 @@ async def _require_user(message: Message, session: AsyncSession):
     assert message.from_user is not None
     user = await UserService(session).get(message.from_user.id)
     if user is None:
-        await message.answer("Сначала выполни /start.")
+        await message.answer("Алдымен /start басыңыз.")
     return user
 
 

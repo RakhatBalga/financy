@@ -25,11 +25,11 @@ router = Router(name="transactions")
 log = structlog.get_logger(__name__)
 
 # Free-text phrases that mean "delete my last entry" rather than a new one.
-_UNDO_WORDS = ("удали", "отмени", "убери", "отмена", "delete", "undo")
+_UNDO_WORDS = ("удали", "отмени", "убери", "отмена", "жой", "өшір", "болдырма", "delete", "undo")
 
 # Phrases meaning "edit/reclassify an existing entry" — must NOT be parsed as
 # a brand-new transaction (that would silently duplicate the amount).
-_EDIT_WORDS = ("смени", "поменяй", "измени", "исправь", "переклассифи")
+_EDIT_WORDS = ("смени", "поменяй", "измени", "исправь", "переклассифи", "өзгерт", "ауыстыр", "түзет")
 
 
 def _is_undo(text: str) -> bool:
@@ -51,17 +51,17 @@ async def handle_free_text(
 
     user = await UserService(session).get(message.from_user.id)
     if user is None:
-        await message.answer("Сначала выполни /start.")
+        await message.answer("Алдымен /start басыңыз.")
         return
 
     # Natural-language "undo": delete the most recent transaction.
     if _is_undo(message.text):
         recent = await TransactionRepository(session).list_recent(user.id, 1)
         if not recent:
-            await message.answer("Нечего удалять — операций пока нет.")
+            await message.answer("Жоятын ештеңе жоқ — операциялар әзірге жоқ.")
             return
         await TransactionService(session).delete(user.id, recent[0].id)
-        await message.answer("🗑 Последняя операция удалена.")
+        await message.answer("🗑 Соңғы операция жойылды.")
         return
 
     # "смени/поменяй/исправь X" — user wants to edit an existing entry, not
@@ -69,9 +69,9 @@ async def handle_free_text(
     # the amount, so redirect to the actual editing flow instead.
     if _is_edit_command(message.text):
         await message.answer(
-            "Изменить существующую операцию текстом нельзя — открой /recent, "
-            "найди нужную запись и используй кнопки ✏️/🗑 под ней "
-            "(для смены категории — кнопку «Категория» под свежим подтверждением)."
+            "Бар операцияны мәтінмен өзгерту мүмкін емес — /recent аш, "
+            "керек жазбаны тауып, астындағы ✏️/🗑 батырмаларын қолдан "
+            "(санатты өзгерту үшін — жаңа растаудың астындағы «Санат» батырмасын)."
         )
         return
 
@@ -79,14 +79,14 @@ async def handle_free_text(
         parsed = await parser.parse(message.text)
     except ExpenseParseError:
         await message.answer(
-            "Не смог распознать трату. Попробуй так: <i>кофе 800</i>."
+            "Шығынды тани алмадым. Былай көр: <i>кофе 800</i>."
         )
         return
     except Exception:  # noqa: BLE001 - surface AI/transport failures gracefully
         log.exception("parse_failed", text=message.text)
         await message.answer(
-            "⏳ Gemini сейчас перегружен. Отправь сообщение ещё раз через "
-            "пару секунд."
+            "⏳ Gemini қазір шамадан тыс жүктелген. Хабарды бірнеше "
+            "секундтан кейін қайта жібер."
         )
         return
 
@@ -100,7 +100,7 @@ async def handle_free_text(
 
 @router.callback_query(F.data.startswith(f"{CONFIRM_PREFIX}:"))
 async def on_confirm(callback: CallbackQuery) -> None:
-    await callback.answer("Сохранено ✅")
+    await callback.answer("Сақталды ✅")
     if isinstance(callback.message, Message):
         await callback.message.edit_reply_markup(reply_markup=None)
 
@@ -112,7 +112,7 @@ async def on_recategorize(callback: CallbackQuery, session: AsyncSession) -> Non
 
     user = await UserService(session).get(callback.from_user.id)
     if user is None:
-        await callback.answer("Сначала выполни /start.", show_alert=True)
+        await callback.answer("Алдымен /start басыңыз.", show_alert=True)
         return
 
     categories = await CategoryRepository(session).list_for_user(user.id)
@@ -130,7 +130,7 @@ async def on_set_category(callback: CallbackQuery, session: AsyncSession) -> Non
 
     user = await UserService(session).get(callback.from_user.id)
     if user is None:
-        await callback.answer("Сначала выполни /start.", show_alert=True)
+        await callback.answer("Алдымен /start басыңыз.", show_alert=True)
         return
 
     updated = await TransactionService(session).change_category(
@@ -139,9 +139,9 @@ async def on_set_category(callback: CallbackQuery, session: AsyncSession) -> Non
         category_id=int(raw_cat),
     )
     if updated is None:
-        await callback.answer("Не удалось изменить категорию.", show_alert=True)
+        await callback.answer("Санатты өзгерту мүмкін болмады.", show_alert=True)
         return
 
-    await callback.answer("Категория обновлена ✅")
+    await callback.answer("Санат жаңартылды ✅")
     if isinstance(callback.message, Message):
         await callback.message.edit_reply_markup(reply_markup=None)

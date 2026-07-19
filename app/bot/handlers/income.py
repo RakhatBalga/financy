@@ -43,14 +43,14 @@ async def _apply_income(
     try:
         await UserService(session).set_income(user, amount)
     except ValueError:
-        await message.answer("Доход должен быть больше нуля.")
+        await message.answer("Кіріс нөлден үлкен болуы керек.")
         return
     await message.answer(
-        f"✅ Ожидаемый доход сохранён: {format_amount(amount, user.currency)}\n"
-        "Это baseline — обновляй только когда сумма реально меняется, "
-        "не каждый месяц. Когда деньги придут, просто запиши "
-        "<i>зарплата 150000</i> — правило учтёт фактические поступления.\n"
-        "Смотри /rule (правило 50/30/20)."
+        f"✅ Күтілетін кіріс сақталды: {format_amount(amount, user.currency)}\n"
+        "Бұл baseline — соманы шын өзгергенде ғана жаңарт, "
+        "әр ай сайын емес. Ақша түскенде жай жаз "
+        "<i>жалақы 150000</i> — ереже нақты түсімдерді ескереді.\n"
+        "/rule (50/30/20 ережесі) қара."
     )
 
 
@@ -65,25 +65,25 @@ async def cmd_income(
 
     user = await UserService(session).get(message.from_user.id)
     if user is None:
-        await message.answer("Сначала выполни /start.")
+        await message.answer("Алдымен /start басыңыз.")
         return
 
     if not command.args:
         current = (
             format_amount(float(user.monthly_income), user.currency)
             if user.monthly_income
-            else "не задан"
+            else "қойылмаған"
         )
         await state.set_state(IncomeStates.waiting)
         await message.answer(
-            f"Текущий доход: {current}\n\n"
-            "Введи месячный доход числом (например 400000):"
+            f"Ағымдағы кіріс: {current}\n\n"
+            "Айлық кірісті санмен енгіз (мысалы 400000):"
         )
         return
 
     amount = _parse_amount(command.args)
     if amount is None:
-        await message.answer("Сумма должна быть числом. Например: /income 400000")
+        await message.answer("Сома сан болуы керек. Мысалы: /income 400000")
         return
     await _apply_income(message, session, user, amount)
 
@@ -104,14 +104,14 @@ async def on_income_amount(
         # Not a number — abandon the input rather than trapping the user.
         await state.clear()
         await message.answer(
-            "Это не похоже на сумму — отменил ввод дохода. "
-            "Задать можно так: <code>/income 400000</code>."
+            "Бұл сомаға ұқсамайды — кіріс енгізуді болдырмадым. "
+            "Былай қоюға болады: <code>/income 400000</code>."
         )
         return
 
     await state.clear()
     user = await UserService(session).get(message.from_user.id)
     if user is None:
-        await message.answer("Сначала выполни /start.")
+        await message.answer("Алдымен /start басыңыз.")
         return
     await _apply_income(message, session, user, amount)

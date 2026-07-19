@@ -19,7 +19,7 @@ async def cmd_subscriptions(message: Message, session: AsyncSession) -> None:
     assert message.from_user is not None
     user = await UserService(session).get(message.from_user.id)
     if user is None:
-        await message.answer("Сначала выполни /start.")
+        await message.answer("Алдымен /start басыңыз.")
         return
     subs = await AnalyticsService(session).detect_subscriptions(user)
     await message.answer(format_subscriptions(subs, user.currency))

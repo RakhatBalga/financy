@@ -29,20 +29,20 @@ from app.scheduler.scheduler import create_scheduler
 log = structlog.get_logger(__name__)
 
 _BOT_COMMANDS = [
-    BotCommand(command="start", description="Начать / помощь"),
-    BotCommand(command="today", description="Траты за сегодня"),
-    BotCommand(command="week", description="Траты за неделю"),
-    BotCommand(command="month", description="Траты за месяц"),
-    BotCommand(command="incomes", description="Доходы и баланс за месяц"),
-    BotCommand(command="chart", description="График за месяц"),
-    BotCommand(command="recent", description="Изменить/удалить траты"),
-    BotCommand(command="setbudget", description="Лимит по категории"),
-    BotCommand(command="income", description="Указать доход"),
-    BotCommand(command="rule", description="Правило 50/30/20"),
-    BotCommand(command="advice", description="AI-разбор месяца"),
-    BotCommand(command="benchmark", description="Сравнение со средним по РК"),
-    BotCommand(command="subscriptions", description="Найти подписки"),
-    BotCommand(command="reset", description="Удалить все траты и бюджеты"),
+    BotCommand(command="start", description="Бастау / көмек"),
+    BotCommand(command="today", description="Бүгінгі шығындар"),
+    BotCommand(command="week", description="Апталық шығындар"),
+    BotCommand(command="month", description="Айлық шығындар"),
+    BotCommand(command="incomes", description="Айлық кіріс пен баланс"),
+    BotCommand(command="chart", description="Айлық диаграмма"),
+    BotCommand(command="recent", description="Шығындарды өзгерту/жою"),
+    BotCommand(command="setbudget", description="Санат бойынша лимит"),
+    BotCommand(command="income", description="Кірісті көрсету"),
+    BotCommand(command="rule", description="50/30/20 ережесі"),
+    BotCommand(command="advice", description="Айдың ЖИ талдауы"),
+    BotCommand(command="benchmark", description="ҚР орташасымен салыстыру"),
+    BotCommand(command="subscriptions", description="Жазылымдарды табу"),
+    BotCommand(command="reset", description="Барлық шығын мен бюджетті жою"),
 ]
 
 

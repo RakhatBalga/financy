@@ -21,18 +21,18 @@ async def cmd_chart(message: Message, session: AsyncSession) -> None:
     assert message.from_user is not None
     user = await UserService(session).get(message.from_user.id)
     if user is None:
-        await message.answer("Сначала выполни /start.")
+        await message.answer("Алдымен /start басыңыз.")
         return
 
     report = await AnalyticsService(session).month(user)
     image = pie_chart(report)
     if image is None:
-        await message.answer("Нет трат за месяц — график построить не из чего.")
+        await message.answer("Айда шығын жоқ — диаграмма құруға дерек жоқ.")
         return
 
     await message.answer_photo(
         BufferedInputFile(image, filename="chart.png"),
-        caption=f"Расходы за месяц: {report.total:,.0f} {report.currency}".replace(
+        caption=f"Айлық шығындар: {report.total:,.0f} {report.currency}".replace(
             ",", " "
         ),
     )

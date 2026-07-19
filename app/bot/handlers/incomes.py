@@ -21,7 +21,7 @@ async def cmd_incomes(message: Message, session: AsyncSession) -> None:
     assert message.from_user is not None
     user = await UserService(session).get(message.from_user.id)
     if user is None:
-        await message.answer("Сначала выполни /start.")
+        await message.answer("Алдымен /start басыңыз.")
         return
 
     income_report, expense_total = await AnalyticsService(session).month_balance(user)

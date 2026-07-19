@@ -13,10 +13,36 @@ from app.db.models import Category
 # Income categories map to None (excluded from the needs/wants/savings math,
 # which counts expenses only).
 CATEGORY_GROUPS: dict[str, str | None] = {
+    # Kazakh canonical
+    "азық-түлік": "needs",
+    "сырттағы тамақ": "wants",
+    "көлік": "needs",
+    "такси": "wants",
+    "тұрғын үй": "needs",
+    "коммуналдық": "needs",
+    "байланыс пен интернет": "needs",
+    "денсаулық": "needs",
+    "киім": "wants",
+    "ойын-сауық": "wants",
+    "жазылымдар": "wants",
+    "білім": "needs",
+    "балаларға": "needs",
+    "сыйлықтар": "wants",
+    "саяхат": "wants",
+    "несие мен бөліп төлеу": "needs",
+    "отбасыға көмек": "needs",
+    "аударымдар": "wants",
+    "басқа": "wants",
+    "депозит": "savings",
+    "жинақ": "savings",
+    "салым": "savings",
+    "инвестиция": "savings",
+    "жалақы": None,
+    "өзге кіріс": None,
+    # Legacy Russian aliases — keep so pre-migration data still maps correctly.
     "продукты": "needs",
     "еда вне дома": "wants",
     "транспорт": "needs",
-    "такси": "wants",
     "жильё": "needs",
     "коммуналка": "needs",
     "связь и интернет": "needs",
@@ -28,13 +54,10 @@ CATEGORY_GROUPS: dict[str, str | None] = {
     "детям": "needs",
     "подарки": "wants",
     "путешествия": "wants",
-    # Contractual/family obligations count as needs, not discretionary wants.
     "кредиты и рассрочка": "needs",
     "помощь семье": "needs",
     "переводы": "wants",
     "прочее": "wants",
-    # Money moved into savings/investments — not a "want", shouldn't inflate it.
-    "депозит": "savings",
     "накопления": "savings",
     "сбережения": "savings",
     "вклад": "savings",
@@ -43,29 +66,29 @@ CATEGORY_GROUPS: dict[str, str | None] = {
     "доход прочее": None,
 }
 
-# Substring keywords for auto-created categories not in the taxonomy above
-# (e.g. user types "мой депозит" or "накопления на авто").
+# Substring keywords for auto-created savings categories (any language).
 _SAVINGS_KEYWORDS: tuple[str, ...] = (
     "депозит",
+    "жинақ",
+    "салым",
+    "инвестици",
     "накоплени",
     "сбережен",
     "вклад",
-    "инвестици",
 )
 
-# Categories pre-created on /start. A curated core subset — the rest are
-# created on demand when the parser first returns them.
+# Categories pre-created on /start (Kazakh). The rest are created on demand.
 DEFAULT_CATEGORIES: tuple[str, ...] = (
-    "продукты",
-    "еда вне дома",
-    "транспорт",
+    "азық-түлік",
+    "сырттағы тамақ",
+    "көлік",
     "такси",
-    "жильё",
-    "коммуналка",
-    "связь и интернет",
-    "здоровье",
-    "развлечения",
-    "прочее",
+    "тұрғын үй",
+    "коммуналдық",
+    "байланыс пен интернет",
+    "денсаулық",
+    "ойын-сауық",
+    "басқа",
 )
 
 

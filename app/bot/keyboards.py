@@ -11,11 +11,11 @@ from aiogram.types import (
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 # Persistent reply-keyboard button labels. Handlers match these exact strings.
-BTN_AI = "🧠 Мнение ИИ"
-BTN_TODAY = "📅 Сегодня"
-BTN_MONTH = "📊 Месяц"
-BTN_INCOME = "💰 Доходы"
-BTN_CHART = "📈 График"
+BTN_AI = "🧠 ЖИ пікірі"
+BTN_TODAY = "📅 Бүгін"
+BTN_MONTH = "📊 Ай"
+BTN_INCOME = "💰 Кірістер"
+BTN_CHART = "📈 Диаграмма"
 
 # All reply-keyboard labels — FSM "waiting for a number" states exclude these so
 # a button press is never mistaken for the typed amount.
@@ -32,13 +32,13 @@ def housing_question_keyboard() -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     builder.row(
         InlineKeyboardButton(
-            text="🏠 Бесплатно (с родителями/семьёй)",
+            text="🏠 Тегін (ата-анамен/отбасымен)",
             callback_data=f"{HOUSING_PREFIX}:1",
         )
     )
     builder.row(
         InlineKeyboardButton(
-            text="💳 Плачу сам(а)", callback_data=f"{HOUSING_PREFIX}:0"
+            text="💳 Өзім төлеймін", callback_data=f"{HOUSING_PREFIX}:0"
         )
     )
     return builder.as_markup()
@@ -52,10 +52,10 @@ def reset_confirm_keyboard() -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     builder.row(
         InlineKeyboardButton(
-            text="🗑 Да, удалить всё", callback_data=f"{RESET_PREFIX}:confirm"
+            text="🗑 Иә, барлығын жою", callback_data=f"{RESET_PREFIX}:confirm"
         ),
         InlineKeyboardButton(
-            text="Отмена", callback_data=f"{RESET_PREFIX}:cancel"
+            text="Болдырмау", callback_data=f"{RESET_PREFIX}:cancel"
         ),
     )
     return builder.as_markup()
@@ -65,12 +65,12 @@ def food_question_keyboard() -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     builder.row(
         InlineKeyboardButton(
-            text="🍽 В основном бесплатно (дома)", callback_data=f"{FOOD_PREFIX}:1"
+            text="🍽 Негізінен тегін (үйде)", callback_data=f"{FOOD_PREFIX}:1"
         )
     )
     builder.row(
         InlineKeyboardButton(
-            text="💳 Плачу сам(а)/трачу на еду", callback_data=f"{FOOD_PREFIX}:0"
+            text="💳 Тамаққа өзім жұмсаймын", callback_data=f"{FOOD_PREFIX}:0"
         )
     )
     return builder.as_markup()
@@ -85,7 +85,7 @@ def main_reply_keyboard() -> ReplyKeyboardMarkup:
             [KeyboardButton(text=BTN_INCOME), KeyboardButton(text=BTN_CHART)],
         ],
         resize_keyboard=True,
-        input_field_placeholder="Напиши трату, напр. «кофе 800»",
+        input_field_placeholder="Шығын жаз, мыс. «кофе 800»",
     )
 
 from app.db.models import Category
@@ -105,15 +105,15 @@ def confirm_keyboard(transaction_id: int) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     builder.row(
         InlineKeyboardButton(
-            text="✅ Ок",
+            text="✅ Жарайды",
             callback_data=f"{CONFIRM_PREFIX}:{transaction_id}",
         ),
         InlineKeyboardButton(
-            text="✏️ Категория",
+            text="✏️ Санат",
             callback_data=f"{RECAT_PREFIX}:{transaction_id}",
         ),
         InlineKeyboardButton(
-            text="🗑 Удалить",
+            text="🗑 Жою",
             callback_data=f"{TXDEL_PREFIX}:{transaction_id}",
         ),
     )
@@ -137,7 +137,7 @@ def category_picker_keyboard(
     builder.adjust(2)
     builder.row(
         InlineKeyboardButton(
-            text="✏️ Своя категория",
+            text="✏️ Өз санатым",
             callback_data=f"{CUSTOM_CAT_PREFIX}:{transaction_id}",
         )
     )
@@ -149,15 +149,15 @@ def transaction_row_keyboard(transaction_id: int) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     builder.row(
         InlineKeyboardButton(
-            text="✏️ Сумма",
+            text="✏️ Сома",
             callback_data=f"{TXEDIT_PREFIX}:{transaction_id}",
         ),
         InlineKeyboardButton(
-            text="🏷 Категория",
+            text="🏷 Санат",
             callback_data=f"{RECAT_PREFIX}:{transaction_id}",
         ),
         InlineKeyboardButton(
-            text="🗑 Удалить",
+            text="🗑 Жою",
             callback_data=f"{TXDEL_PREFIX}:{transaction_id}",
         ),
     )

@@ -20,34 +20,34 @@ from app.services.user_service import UserService
 router = Router(name="start")
 
 _WELCOME = (
-    "👋 Привет! Я помогу вести учёт личных финансов.\n\n"
-    "Просто напиши трату обычным текстом, например:\n"
+    "👋 Сәлем! Жеке қаржыны есепке алуға көмектесемін.\n\n"
+    "Шығынды жай мәтінмен жаз, мысалы:\n"
     "• <i>кофе 800</i>\n"
     "• <i>такси 1500</i>\n"
-    "• <i>зарплата 400000</i>\n\n"
-    "Команды:\n"
-    "/today · /week · /month — расходы за период\n"
-    "/incomes — доходы и баланс за месяц\n"
-    "/chart — график расходов за месяц\n"
-    "/recent — изменить или удалить траты\n"
-    "/setbudget &lt;категория&gt; &lt;сумма&gt; — лимит на месяц\n"
-    "/income &lt;сумма&gt; — указать доход\n"
-    "/rule — правило 50/30/20\n"
-    "/advice — AI-разбор месяца и советы\n"
-    "/benchmark — сравнение со средним по Казахстану\n"
-    "/subscriptions — найти регулярные платежи\n"
-    "/reset — удалить ВСЕ траты, доходы и бюджеты"
+    "• <i>жалақы 400000</i>\n\n"
+    "Командалар:\n"
+    "/today · /week · /month — кезең бойынша шығындар\n"
+    "/incomes — айлық кіріс пен баланс\n"
+    "/chart — айлық шығын диаграммасы\n"
+    "/recent — шығындарды өзгерту немесе жою\n"
+    "/setbudget &lt;санат&gt; &lt;сома&gt; — айлық лимит\n"
+    "/income &lt;сома&gt; — кірісті көрсету\n"
+    "/rule — 50/30/20 ережесі\n"
+    "/advice — айдың ЖИ талдауы мен кеңестер\n"
+    "/benchmark — Қазақстан орташасымен салыстыру\n"
+    "/subscriptions — тұрақты төлемдерді табу\n"
+    "/reset — БАРЛЫҚ шығын, кіріс пен бюджетті жою"
 )
 
 _ONBOARDING_INTRO = (
-    "Ещё пара вопросов — это поможет точнее считать советы "
-    "(например, не придумывать тебе аренду, если ты живёшь с родителями)."
+    "Тағы бірнеше сұрақ — бұл кеңестерді дәлірек есептеуге көмектеседі "
+    "(мысалы, ата-анаңмен тұрсаң, жалдау ақысын ойдан шығармау үшін)."
 )
 
 
 async def _ask_housing(message: Message) -> None:
     await message.answer(
-        _ONBOARDING_INTRO + "\n\nЖильё — ты платишь за него сам(а) или бесплатно?",
+        _ONBOARDING_INTRO + "\n\nТұрғын үй — оны өзің төлейсің бе, әлде тегін бе?",
         reply_markup=housing_question_keyboard(),
     )
 
@@ -61,7 +61,7 @@ async def cmd_start(message: Message, session: AsyncSession) -> None:
         username=message.from_user.username,
     )
 
-    prefix = "" if created else "С возвращением!\n\n"
+    prefix = "" if created else "Қайта келуіңізбен!\n\n"
     await message.answer(prefix + _WELCOME, reply_markup=main_reply_keyboard())
 
     if user.housing_is_free is None:
@@ -69,7 +69,7 @@ async def cmd_start(message: Message, session: AsyncSession) -> None:
     elif user.food_is_free is None:
         # Resume: housing was answered in a prior /start but food wasn't yet.
         await message.answer(
-            "А питание — в основном ешь дома бесплатно, или тратишь на еду сам(а)?",
+            "Ал тамақ — негізінен үйде тегін жейсің бе, әлде тамаққа өзің жұмсайсың ба?",
             reply_markup=food_question_keyboard(),
         )
 
@@ -81,7 +81,7 @@ async def on_housing_answer(callback: CallbackQuery, session: AsyncSession) -> N
 
     user = await UserService(session).get(callback.from_user.id)
     if user is None:
-        await callback.answer("Сначала выполни /start.", show_alert=True)
+        await callback.answer("Алдымен /start басыңыз.", show_alert=True)
         return
 
     # Commit now (not just flush) — the food answer arrives in a *separate*
@@ -94,7 +94,7 @@ async def on_housing_answer(callback: CallbackQuery, session: AsyncSession) -> N
     if isinstance(callback.message, Message):
         await callback.message.edit_reply_markup(reply_markup=None)
         await callback.message.answer(
-            "А питание — в основном ешь дома бесплатно, или тратишь на еду сам(а)?",
+            "Ал тамақ — негізінен үйде тегін жейсің бе, әлде тамаққа өзің жұмсайсың ба?",
             reply_markup=food_question_keyboard(),
         )
 
@@ -106,7 +106,7 @@ async def on_food_answer(callback: CallbackQuery, session: AsyncSession) -> None
 
     user = await UserService(session).get(callback.from_user.id)
     if user is None:
-        await callback.answer("Сначала выполни /start.", show_alert=True)
+        await callback.answer("Алдымен /start басыңыз.", show_alert=True)
         return
 
     housing_is_free = bool(user.housing_is_free)
@@ -114,10 +114,10 @@ async def on_food_answer(callback: CallbackQuery, session: AsyncSession) -> None
         user, housing_is_free=housing_is_free, food_is_free=food_is_free
     )
 
-    await callback.answer("Спасибо, учту это в советах ✅")
+    await callback.answer("Рахмет, мұны кеңестерде ескеремін ✅")
     if isinstance(callback.message, Message):
         await callback.message.edit_reply_markup(reply_markup=None)
         await callback.message.answer(
-            "Готово! Можешь писать траты обычным текстом или открыть /rule "
-            "и 🧠 «Мнение ИИ» — теперь советы точнее."
+            "Дайын! Шығындарды жай мәтінмен жаза аласың немесе /rule "
+            "және 🧠 «ЖИ пікірі» аша аласың — енді кеңестер дәлірек."
         )
