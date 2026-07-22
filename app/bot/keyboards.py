@@ -199,6 +199,7 @@ def transaction_row_keyboard(transaction_id: int) -> InlineKeyboardMarkup:
 
 
 ASSET_ADD_POSITION = "asset:add_position"
+ASSET_SELL_POSITION = "asset:sell_position"
 ASSET_ADD_DEPOSIT = "asset:add_deposit"
 ASSET_ADD_GOAL = "asset:add_goal"
 ASSET_DELETE_PREFIX = "assetdel"
@@ -213,15 +214,20 @@ def portfolio_actions_keyboard(
     builder.row(
         InlineKeyboardButton(
             text="➕ Добавить акцию", callback_data=ASSET_ADD_POSITION
-        )
+        ),
+        InlineKeyboardButton(
+            text="💵 Продать", callback_data=ASSET_SELL_POSITION
+        ),
     )
-    for item_id, symbol in positions or []:
-        builder.button(
+    delete_buttons = [
+        InlineKeyboardButton(
             text=f"🗑 {symbol}",
             callback_data=f"{ASSET_DELETE_PREFIX}:position:{item_id}",
         )
-    if positions:
-        builder.adjust(1, 2)
+        for item_id, symbol in positions or []
+    ]
+    for index in range(0, len(delete_buttons), 2):
+        builder.row(*delete_buttons[index : index + 2])
     return builder.as_markup()
 
 

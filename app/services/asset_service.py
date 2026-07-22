@@ -5,9 +5,16 @@ from __future__ import annotations
 import asyncio
 from dataclasses import dataclass
 
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.models import Deposit, FinancialGoal, InvestmentPosition
+from app.db.models import (
+    BrokerAccount,
+    Deposit,
+    FinancialGoal,
+    InvestmentPosition,
+    StockSale,
+)
 from app.repositories.asset_repo import AssetRepository
 from app.services.market_data import MarketDataError, YahooFinanceService
 
@@ -36,10 +43,19 @@ class WealthSummary:
     positions: list[PositionValue]
     deposits: list[Deposit]
     usd_kzt: float
+    broker_account: BrokerAccount | None = None
 
     @property
     def portfolio_usd(self) -> float:
         return sum(item.value_usd for item in self.positions)
+
+    @property
+    def broker_cash_usd(self) -> float:
+        return float(self.broker_account.cash_usd) if self.broker_account else 0
+
+    @property
+    def broker_total_usd(self) -> float:
+        return self.portfolio_usd + self.broker_cash_usd
 
     @property
     def deposits_kzt(self) -> float:
@@ -50,11 +66,18 @@ class WealthSummary:
 
     @property
     def total_kzt(self) -> float:
-        return self.portfolio_usd * self.usd_kzt + self.deposits_kzt
+        return self.broker_total_usd * self.usd_kzt + self.deposits_kzt
 
     @property
     def total_usd(self) -> float:
         return self.total_kzt / self.usd_kzt
+
+
+@dataclass(frozen=True)
+class SaleResult:
+    sale: StockSale
+    account: BrokerAccount
+    remaining_quantity: float
 
 
 class AssetService:
@@ -162,9 +185,108 @@ class AssetService:
     async def goals(self, user_id: int) -> list[FinancialGoal]:
         return await self._repo.list_goals(user_id)
 
+    async def broker_account(self, user_id: int) -> BrokerAccount | None:
+        return await self._session.scalar(
+            select(BrokerAccount).where(BrokerAccount.user_id == user_id)
+        )
+
+    async def set_broker_snapshot(
+        self,
+        user_id: int,
+        *,
+        cash_usd: float,
+        realized_pnl_usd: float,
+        transaction_count: int,
+        reported_total_pnl_usd: float | None = None,
+        reported_total_pnl_percent: float | None = None,
+    ) -> BrokerAccount:
+        account = await self.broker_account(user_id)
+        if account is None:
+            account = BrokerAccount(user_id=user_id)
+            self._session.add(account)
+        account.cash_usd = cash_usd
+        account.realized_pnl_usd = realized_pnl_usd
+        account.transaction_count = transaction_count
+        account.reported_total_pnl_usd = reported_total_pnl_usd
+        account.reported_total_pnl_percent = reported_total_pnl_percent
+        await self._session.commit()
+        return account
+
+    async def sell_position(
+        self, user_id: int, symbol: str, quantity: float, sell_price_usd: float
+    ) -> SaleResult:
+        normalized = symbol.strip().upper()
+        if not normalized or quantity <= 0 or sell_price_usd <= 0:
+            raise ValueError("sale values must be positive")
+
+        positions = list(
+            (
+                await self._session.execute(
+                    select(InvestmentPosition)
+                    .where(
+                        InvestmentPosition.user_id == user_id,
+                        InvestmentPosition.symbol == normalized,
+                    )
+                    .order_by(
+                        InvestmentPosition.created_at.asc(),
+                        InvestmentPosition.id.asc(),
+                    )
+                    .with_for_update()
+                )
+            )
+            .scalars()
+            .all()
+        )
+        available = sum(float(item.quantity) for item in positions)
+        if available + 1e-9 < quantity:
+            raise ValueError(f"only {available:g} shares available")
+
+        remaining_to_sell = quantity
+        sold_cost = 0.0
+        for position in positions:
+            owned = float(position.quantity)
+            sold = min(owned, remaining_to_sell)
+            sold_cost += sold * float(position.average_price_usd)
+            new_quantity = owned - sold
+            if new_quantity <= 1e-9:
+                await self._session.delete(position)
+            else:
+                position.quantity = new_quantity
+            remaining_to_sell -= sold
+            if remaining_to_sell <= 1e-9:
+                break
+
+        average_buy_price = sold_cost / quantity
+        realized_pnl = quantity * (sell_price_usd - average_buy_price)
+
+        account = await self._session.scalar(
+            select(BrokerAccount)
+            .where(BrokerAccount.user_id == user_id)
+            .with_for_update()
+        )
+        if account is None:
+            account = BrokerAccount(user_id=user_id)
+            self._session.add(account)
+        account.cash_usd = float(account.cash_usd or 0) + quantity * sell_price_usd
+        account.realized_pnl_usd = float(account.realized_pnl_usd or 0) + realized_pnl
+        account.transaction_count = int(account.transaction_count or 0) + 1
+
+        sale = StockSale(
+            user_id=user_id,
+            symbol=normalized,
+            quantity=quantity,
+            average_buy_price_usd=average_buy_price,
+            sell_price_usd=sell_price_usd,
+            realized_pnl_usd=realized_pnl,
+        )
+        self._session.add(sale)
+        await self._session.commit()
+        return SaleResult(sale, account, available - quantity)
+
     async def wealth(self, user_id: int) -> WealthSummary:
         positions = await self.positions(user_id)
         deposits = await self.deposits(user_id)
+        account = await self.broker_account(user_id)
         usd_kzt = await self._market.usd_kzt()
 
         async def value_position(position: InvestmentPosition) -> PositionValue:
@@ -183,7 +305,7 @@ class AssetService:
         values = list(
             await asyncio.gather(*(value_position(item) for item in positions))
         )
-        return WealthSummary(values, deposits, usd_kzt)
+        return WealthSummary(values, deposits, usd_kzt, account)
 
     async def delete_position(self, user_id: int, item_id: int) -> bool:
         return await self._repo.delete_owned(InvestmentPosition, user_id, item_id)

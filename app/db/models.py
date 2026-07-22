@@ -12,6 +12,7 @@ from sqlalchemy import (
     Enum,
     ForeignKey,
     Index,
+    Integer,
     Numeric,
     String,
     UniqueConstraint,
@@ -39,9 +40,7 @@ class User(Base):
     username: Mapped[str | None] = mapped_column(String(64), nullable=True)
     currency: Mapped[str] = mapped_column(String(8), nullable=False, default="KZT")
     # Declared monthly income; enables the 50/30/20 advice. NULL until set.
-    monthly_income: Mapped[float | None] = mapped_column(
-        Numeric(14, 2), nullable=True
-    )
+    monthly_income: Mapped[float | None] = mapped_column(Numeric(14, 2), nullable=True)
     # Living situation, asked once on /start: True = free (with parents/family),
     # False = pays for it themselves, NULL = not answered yet. Used so the AI's
     # hypothetical budget doesn't invent rent/food money the user doesn't spend.
@@ -69,6 +68,12 @@ class User(Base):
     financial_goals: Mapped[list[FinancialGoal]] = relationship(
         back_populates="user", cascade="all, delete-orphan"
     )
+    broker_account: Mapped[BrokerAccount | None] = relationship(
+        back_populates="user", cascade="all, delete-orphan", uselist=False
+    )
+    stock_sales: Mapped[list[StockSale]] = relationship(
+        back_populates="user", cascade="all, delete-orphan"
+    )
 
 
 class Category(Base):
@@ -87,17 +92,13 @@ class Category(Base):
     group_type: Mapped[str | None] = mapped_column(String(16), nullable=True)
 
     user: Mapped[User] = relationship(back_populates="categories")
-    transactions: Mapped[list[Transaction]] = relationship(
-        back_populates="category"
-    )
+    transactions: Mapped[list[Transaction]] = relationship(back_populates="category")
     budgets: Mapped[list[Budget]] = relationship(back_populates="category")
 
 
 class Transaction(Base):
     __tablename__ = "transactions"
-    __table_args__ = (
-        Index("ix_transactions_user_created", "user_id", "created_at"),
-    )
+    __table_args__ = (Index("ix_transactions_user_created", "user_id", "created_at"),)
 
     id: Mapped[int] = mapped_column(primary_key=True)
     user_id: Mapped[int] = mapped_column(
@@ -204,3 +205,58 @@ class FinancialGoal(Base):
     )
 
     user: Mapped[User] = relationship(back_populates="financial_goals")
+
+
+class BrokerAccount(Base):
+    """Cumulative broker metrics and uninvested USD cash."""
+
+    __tablename__ = "broker_accounts"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"),
+        unique=True,
+        index=True,
+        nullable=False,
+    )
+    cash_usd: Mapped[float] = mapped_column(Numeric(18, 2), nullable=False, default=0)
+    realized_pnl_usd: Mapped[float] = mapped_column(
+        Numeric(18, 2), nullable=False, default=0
+    )
+    transaction_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    reported_total_pnl_usd: Mapped[float | None] = mapped_column(
+        Numeric(18, 2), nullable=True
+    )
+    reported_total_pnl_percent: Mapped[float | None] = mapped_column(
+        Numeric(8, 3), nullable=True
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+    user: Mapped[User] = relationship(back_populates="broker_account")
+
+
+class StockSale(Base):
+    """An immutable realized stock sale used for the P/L history."""
+
+    __tablename__ = "stock_sales"
+    __table_args__ = (Index("ix_stock_sales_user_created", "user_id", "created_at"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    symbol: Mapped[str] = mapped_column(String(24), nullable=False)
+    quantity: Mapped[float] = mapped_column(Numeric(18, 6), nullable=False)
+    average_buy_price_usd: Mapped[float] = mapped_column(Numeric(18, 4), nullable=False)
+    sell_price_usd: Mapped[float] = mapped_column(Numeric(18, 4), nullable=False)
+    realized_pnl_usd: Mapped[float] = mapped_column(Numeric(18, 2), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    user: Mapped[User] = relationship(back_populates="stock_sales")

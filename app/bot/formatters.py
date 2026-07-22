@@ -6,7 +6,7 @@ from html import escape
 
 from app.db.models import Deposit, FinancialGoal, Transaction
 from app.services.advisor_service import RuleBreakdown
-from app.services.asset_service import PositionValue, WealthSummary
+from app.services.asset_service import PositionValue, SaleResult, WealthSummary
 from app.services.budget_service import BudgetAlert
 from app.services.schemas import ParsedTransaction, PeriodReport
 
@@ -21,6 +21,10 @@ def format_usd(value: float) -> str:
     return f"{sign}${abs(value):,.2f}"
 
 
+def format_signed_usd(value: float) -> str:
+    return f"{'+' if value >= 0 else '-'}${abs(value):,.2f}"
+
+
 def format_kzt(value: float) -> str:
     sign = "-" if value < 0 else ""
     amount = f"{abs(value):,.0f}".replace(",", " ")
@@ -28,19 +32,35 @@ def format_kzt(value: float) -> str:
 
 
 def format_portfolio_header(summary: WealthSummary) -> str:
-    if not summary.positions:
+    account = summary.broker_account
+    if not summary.positions and account is None:
         return "💼 <b>Инвестиционный портфель</b>\nПока нет акций."
     cost = sum(item.cost_usd for item in summary.positions)
     profit = summary.portfolio_usd - cost
     icon = "🟢" if profit >= 0 else "🔴"
-    return (
-        "💼 <b>Инвестиционный портфель</b>\n"
-        f"Текущая стоимость: <b>{format_usd(summary.portfolio_usd)}</b> · "
-        f"<b>{format_kzt(summary.portfolio_usd * summary.usd_kzt)}</b>\n"
-        f"{icon} Результат: {format_usd(profit)} · "
-        f"{format_kzt(profit * summary.usd_kzt)}\n"
-        f"Курс Yahoo: $1 = {summary.usd_kzt:,.2f} ₸"
-    )
+    lines = [
+        "💼 <b>Инвестиционный портфель</b>",
+        f"Чистые активы брокера: <b>{format_usd(summary.broker_total_usd)}</b> · "
+        f"<b>{format_kzt(summary.broker_total_usd * summary.usd_kzt)}</b>",
+        f"Акции: {format_usd(summary.portfolio_usd)} · "
+        f"кэш: {format_usd(summary.broker_cash_usd)}",
+        f"{icon} Нереализованный P/L: {format_signed_usd(profit)} · "
+        f"{format_kzt(profit * summary.usd_kzt)}",
+    ]
+    if account is not None:
+        realized = float(account.realized_pnl_usd)
+        lines.append(f"📈 P/L закрытых сделок: <b>{format_signed_usd(realized)}</b>")
+        if account.reported_total_pnl_usd is not None:
+            total_pnl = float(account.reported_total_pnl_usd)
+            total_percent = float(account.reported_total_pnl_percent or 0)
+            total_icon = "🟢" if total_pnl >= 0 else "🔴"
+            lines.append(
+                f"{total_icon} За всё время: {format_signed_usd(total_pnl)} "
+                f"({total_percent:+.2f}%)"
+            )
+        lines.append(f"Операций: {account.transaction_count}")
+    lines.append(f"Курс Yahoo: $1 = {summary.usd_kzt:,.2f} ₸")
+    return "\n".join(lines)
 
 
 def format_position(item: PositionValue, usd_kzt: float) -> str:
@@ -115,11 +135,27 @@ def format_capital(summary: WealthSummary) -> str:
         "💰 <b>Общий капитал</b>\n"
         f"<b>{format_kzt(summary.total_kzt)}</b>\n"
         f"<b>{format_usd(summary.total_usd)}</b>\n\n"
-        f"Акции: {format_usd(summary.portfolio_usd)} · "
-        f"{format_kzt(summary.portfolio_usd * summary.usd_kzt)}\n"
+        f"Брокерский счёт: {format_usd(summary.broker_total_usd)} · "
+        f"{format_kzt(summary.broker_total_usd * summary.usd_kzt)}\n"
         f"Депозиты: {format_usd(summary.deposits_kzt / summary.usd_kzt)} · "
         f"{format_kzt(summary.deposits_kzt)}\n"
         f"Курс Yahoo: $1 = {summary.usd_kzt:,.2f} ₸"
+    )
+
+
+def format_sale(result: SaleResult) -> str:
+    sale = result.sale
+    pnl = float(sale.realized_pnl_usd)
+    icon = "🟢" if pnl >= 0 else "🔴"
+    quantity = f"{float(sale.quantity):g}"
+    return (
+        f"✅ <b>{escape(sale.symbol)} продано</b>\n"
+        f"{quantity} шт. по {format_usd(float(sale.sell_price_usd))}\n"
+        f"Средняя цена входа: {format_usd(float(sale.average_buy_price_usd))}\n"
+        f"{icon} Результат сделки: <b>{format_signed_usd(pnl)}</b>\n"
+        f"P/L закрытых сделок: "
+        f"<b>{format_signed_usd(float(result.account.realized_pnl_usd))}</b>\n"
+        f"Осталось акций: {result.remaining_quantity:g}"
     )
 
 
@@ -248,9 +284,7 @@ def format_subscriptions(subs: list[dict[str, object]], currency: str) -> str:
     if not subs:
         return "Тұрақты төлемдер таппадым (≥2 ай тарихы керек)."
     total = sum(float(s["amount"]) for s in subs)  # type: ignore[arg-type]
-    lines = [
-        f"🔁 <b>Жазылым сияқты</b> — ~{format_amount(total, currency)}/ай:"
-    ]
+    lines = [f"🔁 <b>Жазылым сияқты</b> — ~{format_amount(total, currency)}/ай:"]
     for s in subs[:10]:
         amount = format_amount(float(s["amount"]), currency)  # type: ignore[arg-type]
         lines.append(f"• {s['description']}: {amount} × {s['months']} ай")
@@ -267,9 +301,7 @@ def format_benchmark(rows: list[tuple[str, float, float]]) -> str:
     for name, user_pct, kz_pct in rows:
         lines.append(f"{name[:14]:<14}{user_pct:>5.0f}%{kz_pct:>5.0f}%")
     lines.append("</pre>")
-    lines.append(
-        "<i>Сома емес, үлес салыстырылады — кез келген кірісте әділ.</i>"
-    )
+    lines.append("<i>Сома емес, үлес салыстырылады — кез келген кірісте әділ.</i>")
     return "\n".join(lines)
 
 

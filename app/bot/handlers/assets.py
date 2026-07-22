@@ -16,6 +16,7 @@ from app.bot.formatters import (
     format_deposit,
     format_goal,
     format_portfolio,
+    format_sale,
 )
 from app.bot.keyboards import (
     ASSET_ADD_DEPOSIT,
@@ -24,6 +25,7 @@ from app.bot.keyboards import (
     ASSET_DELETE_PREFIX,
     ASSET_DEPOSIT_UPDATE_PREFIX,
     ASSET_GOAL_UPDATE_PREFIX,
+    ASSET_SELL_POSITION,
     CAPITAL_BUTTONS,
     DEPOSIT_BUTTONS,
     FIN_GOAL_BUTTONS,
@@ -44,6 +46,7 @@ router = Router(name="assets")
 
 class AssetInput(StatesGroup):
     position = State()
+    sale = State()
     deposit = State()
     goal = State()
     goal_amount = State()
@@ -255,6 +258,50 @@ async def add_position_finish(
         f"✅ {symbol}: {quantity:g} шт. по ${average_price:,.2f} сохранено. "
         f"Текущая цена Yahoo: ${quote.price:,.2f}."
     )
+
+
+@router.callback_query(F.data == ASSET_SELL_POSITION)
+async def sell_position_start(callback: CallbackQuery, state: FSMContext) -> None:
+    await state.set_state(AssetInput.sale)
+    await callback.answer()
+    if isinstance(callback.message, Message):
+        await callback.message.answer(
+            "Введите тикер, количество и фактическую цену продажи в USD:\n"
+            "<code>APLD 5 35</code>"
+        )
+
+
+@router.message(
+    StateFilter(AssetInput.sale),
+    F.text,
+    ~F.text.startswith("/"),
+    ~F.text.in_(MENU_BUTTONS),
+)
+async def sell_position_finish(
+    message: Message, state: FSMContext, session: AsyncSession
+) -> None:
+    assert message.text is not None
+    user = await _user(message, session)
+    if user is None:
+        return
+    parts = message.text.split()
+    try:
+        if len(parts) != 3 or not re.fullmatch(r"[A-Za-z0-9.^=-]{1,24}", parts[0]):
+            raise ValueError("неверный формат")
+        result = await AssetService(session).sell_position(
+            user_id=user.id,
+            symbol=parts[0],
+            quantity=_number(parts[1]),
+            sell_price_usd=_number(parts[2]),
+        )
+    except ValueError as exc:
+        await message.answer(
+            "Не удалось записать продажу. Проверьте тикер, количество и цену. "
+            f"Формат: <code>APLD 5 35</code>. ({exc})"
+        )
+        return
+    await state.clear()
+    await message.answer(format_sale(result))
 
 
 @router.callback_query(F.data == ASSET_ADD_DEPOSIT)

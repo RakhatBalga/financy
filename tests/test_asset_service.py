@@ -73,3 +73,47 @@ async def test_deposit_balance_can_be_updated(
 
     assert updated is not None
     assert float(updated.balance) == pytest.approx(125_000)
+
+
+async def test_sales_update_quantity_cash_and_cumulative_pnl(
+    session: AsyncSession, user: User
+) -> None:
+    service = AssetService(session, FakeMarket())  # type: ignore[arg-type]
+    await service.add_position(user.id, "AAPL", 10, 100)
+    await service.set_broker_snapshot(
+        user.id,
+        cash_usd=0,
+        realized_pnl_usd=1_003.31,
+        transaction_count=207,
+        reported_total_pnl_usd=-223.99,
+        reported_total_pnl_percent=-4.67,
+    )
+
+    profitable = await service.sell_position(user.id, "AAPL", 4, 120)
+    losing = await service.sell_position(user.id, "AAPL", 2, 80)
+    positions = await service.positions(user.id)
+
+    assert float(profitable.sale.realized_pnl_usd) == pytest.approx(80)
+    assert float(losing.sale.realized_pnl_usd) == pytest.approx(-40)
+    assert float(losing.account.realized_pnl_usd) == pytest.approx(1_043.31)
+    assert float(losing.account.cash_usd) == pytest.approx(640)
+    assert losing.account.transaction_count == 209
+    assert losing.remaining_quantity == pytest.approx(4)
+    assert len(positions) == 1
+    assert float(positions[0].quantity) == pytest.approx(4)
+
+
+async def test_sale_uses_fifo_for_multiple_purchase_lots(
+    session: AsyncSession, user: User
+) -> None:
+    service = AssetService(session, FakeMarket())  # type: ignore[arg-type]
+    await service.add_position(user.id, "AAPL", 5, 100)
+    await service.add_position(user.id, "AAPL", 5, 200)
+
+    result = await service.sell_position(user.id, "AAPL", 5, 150)
+    positions = await service.positions(user.id)
+
+    assert float(result.sale.average_buy_price_usd) == pytest.approx(100)
+    assert float(result.sale.realized_pnl_usd) == pytest.approx(250)
+    assert len(positions) == 1
+    assert float(positions[0].average_price_usd) == pytest.approx(200)
