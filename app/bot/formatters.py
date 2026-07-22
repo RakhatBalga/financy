@@ -31,6 +31,11 @@ def format_kzt(value: float) -> str:
     return f"{sign}{amount} ₸"
 
 
+def format_signed_kzt(value: float) -> str:
+    amount = f"{abs(value):,.0f}".replace(",", " ")
+    return f"{'+' if value >= 0 else '-'}{amount} ₸"
+
+
 def format_portfolio_header(summary: WealthSummary) -> str:
     account = summary.broker_account
     if not summary.positions and account is None:
@@ -50,6 +55,12 @@ def format_portfolio_header(summary: WealthSummary) -> str:
     if account is not None:
         realized = float(account.realized_pnl_usd)
         lines.append(f"📈 P/L закрытых сделок: <b>{format_signed_usd(realized)}</b>")
+        combined_pnl = profit + realized
+        combined_icon = "🟢" if combined_pnl >= 0 else "🔴"
+        lines.append(
+            f"{combined_icon} Общий P/L: <b>{format_signed_usd(combined_pnl)}</b> · "
+            f"<b>{format_signed_kzt(combined_pnl * summary.usd_kzt)}</b>"
+        )
         if account.reported_total_pnl_usd is not None:
             total_pnl = float(account.reported_total_pnl_usd)
             total_percent = float(account.reported_total_pnl_percent or 0)

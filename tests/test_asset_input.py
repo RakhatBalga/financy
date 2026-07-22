@@ -1,9 +1,14 @@
 """Tests for human-friendly asset input formats."""
 
-from app.bot.formatters import format_deposits, format_goal, format_goals
+from app.bot.formatters import (
+    format_deposits,
+    format_goal,
+    format_goals,
+    format_portfolio_header,
+)
 from app.bot.handlers.assets import _goal_input
-from app.db.models import BrokerAccount, Deposit, FinancialGoal
-from app.services.asset_service import WealthSummary
+from app.db.models import BrokerAccount, Deposit, FinancialGoal, InvestmentPosition
+from app.services.asset_service import PositionValue, WealthSummary
 
 
 def test_simple_goal_input_defaults_to_zero_kzt() -> None:
@@ -88,3 +93,22 @@ def test_goals_formatter_uses_complete_net_worth() -> None:
     assert "Весь капитал: <b>1 000 000 ₸</b> · <b>$2,000.00</b>" in text
     assert "10.0%" in text
     assert "Осталось: 9 000 000 ₸ (90.0%)" in text
+
+
+def test_portfolio_combines_realized_and_unrealized_pnl() -> None:
+    position = InvestmentPosition(
+        id=1,
+        user_id=1,
+        symbol="AAPL",
+        quantity=2,
+        average_price_usd=100,
+    )
+    value = PositionValue(position, 120, 200, 240)
+    account = BrokerAccount(
+        user_id=1, cash_usd=0, realized_pnl_usd=100, transaction_count=1
+    )
+    summary = WealthSummary([value], [], 500, account)
+
+    text = format_portfolio_header(summary)
+
+    assert "Общий P/L: <b>+$140.00</b> · <b>+70 000 ₸</b>" in text
