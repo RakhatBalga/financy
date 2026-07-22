@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
+import asyncio
 import re
 from datetime import datetime
-from zoneinfo import ZoneInfo
 
 from aiogram import F, Router
 from aiogram.filters import Command, StateFilter
@@ -135,16 +135,19 @@ async def show_portfolio(
         await message.answer("Yahoo Finance сейчас недоступен. Попробуйте чуть позже.")
         return
     try:
-        forecasts = await market.forecasts(
-            [item.position.symbol for item in summary.positions]
+        forecasts = await asyncio.wait_for(
+            market.forecasts(
+                [item.position.symbol for item in summary.positions]
+            ),
+            timeout=10,
         )
-    except MarketDataError:
+    except (MarketDataError, TimeoutError):
         forecasts = {}
     await message.answer(
         format_portfolio(
             summary,
             forecasts,
-            datetime.now(ZoneInfo(user.timezone)).year,
+            datetime.now().year,
         ),
         reply_markup=portfolio_actions_keyboard(
             [(item.position.id, item.position.symbol) for item in summary.positions]
