@@ -101,11 +101,12 @@ def format_goal(item: FinancialGoal) -> str:
     bar = "█" * filled + "░" * (10 - filled)
     formatter = format_usd if item.currency == "USD" else format_kzt
     remaining = max(0, target - current)
+    remaining_percent = max(0, 100 - percent)
     return (
         f"🎯 <b>{escape(item.title)}</b>\n"
         f"{bar} {percent:.1f}%\n"
         f"Накоплено: {formatter(current)} из {formatter(target)}\n"
-        f"Осталось: {formatter(remaining)}"
+        f"Осталось: {formatter(remaining)} ({remaining_percent:.1f}%)"
     )
 
 
