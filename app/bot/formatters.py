@@ -113,6 +113,32 @@ def format_deposit(item: Deposit, usd_kzt: float | None = None) -> str:
     return "\n".join(lines)
 
 
+def format_deposits(items: list[Deposit]) -> str:
+    """Render all deposits in one compact message."""
+    if not items:
+        return "🏦 <b>Депозиты</b>\nПока нет депозитов."
+
+    total_kzt = sum(float(item.balance) for item in items if item.currency == "KZT")
+    total_usd = sum(float(item.balance) for item in items if item.currency == "USD")
+    totals = []
+    if total_kzt:
+        totals.append(format_kzt(total_kzt))
+    if total_usd:
+        totals.append(format_usd(total_usd))
+
+    lines = ["🏦 <b>Депозиты</b>", f"Всего: <b>{' · '.join(totals)}</b>"]
+    for item in items:
+        balance = float(item.balance)
+        amount = format_usd(balance) if item.currency == "USD" else format_kzt(balance)
+        rate = (
+            f" · {float(item.annual_rate):g}% годовых"
+            if item.annual_rate is not None
+            else ""
+        )
+        lines.append(f"• <b>{escape(item.name)}</b> — {amount}{rate}")
+    return "\n".join(lines)
+
+
 def format_goal(item: FinancialGoal) -> str:
     current = float(item.current_amount)
     target = float(item.target_amount)

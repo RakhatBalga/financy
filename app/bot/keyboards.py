@@ -88,9 +88,7 @@ def reset_confirm_keyboard() -> InlineKeyboardMarkup:
         InlineKeyboardButton(
             text="🗑 Иә, барлығын жою", callback_data=f"{RESET_PREFIX}:confirm"
         ),
-        InlineKeyboardButton(
-            text="Болдырмау", callback_data=f"{RESET_PREFIX}:cancel"
-        ),
+        InlineKeyboardButton(text="Болдырмау", callback_data=f"{RESET_PREFIX}:cancel"),
     )
     return builder.as_markup()
 
@@ -123,6 +121,7 @@ def main_reply_keyboard() -> ReplyKeyboardMarkup:
         resize_keyboard=True,
         input_field_placeholder="Шығын жаз, мыс. «кофе 800»",
     )
+
 
 # Callback data format: "confirm:<transaction_id>" / "recat:<transaction_id>"
 # and for the category picker: "setcat:<transaction_id>:<category_id>".
@@ -215,9 +214,7 @@ def portfolio_actions_keyboard(
         InlineKeyboardButton(
             text="➕ Добавить акцию", callback_data=ASSET_ADD_POSITION
         ),
-        InlineKeyboardButton(
-            text="💵 Продать", callback_data=ASSET_SELL_POSITION
-        ),
+        InlineKeyboardButton(text="💵 Продать", callback_data=ASSET_SELL_POSITION),
     )
     delete_buttons = [
         InlineKeyboardButton(
@@ -231,18 +228,38 @@ def portfolio_actions_keyboard(
     return builder.as_markup()
 
 
-def deposit_actions_keyboard() -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup(
-        inline_keyboard=[
-            [InlineKeyboardButton(text="➕ Добавить депозит", callback_data=ASSET_ADD_DEPOSIT)]
-        ]
+def deposit_actions_keyboard(
+    deposits: list[tuple[int, str]] | None = None,
+) -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    builder.row(
+        InlineKeyboardButton(
+            text="➕ Добавить депозит", callback_data=ASSET_ADD_DEPOSIT
+        )
     )
+    for item_id, name in deposits or []:
+        label = name[:18]
+        builder.row(
+            InlineKeyboardButton(
+                text=f"✏️ {label}",
+                callback_data=f"{ASSET_DEPOSIT_UPDATE_PREFIX}:{item_id}",
+            ),
+            InlineKeyboardButton(
+                text=f"🗑 {label}",
+                callback_data=f"{ASSET_DELETE_PREFIX}:deposit:{item_id}",
+            ),
+        )
+    return builder.as_markup()
 
 
 def goal_actions_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text="➕ Добавить цель", callback_data=ASSET_ADD_GOAL)]
+            [
+                InlineKeyboardButton(
+                    text="➕ Добавить цель", callback_data=ASSET_ADD_GOAL
+                )
+            ]
         ]
     )
 

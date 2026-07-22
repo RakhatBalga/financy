@@ -13,7 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.bot.formatters import (
     format_capital,
-    format_deposit,
+    format_deposits,
     format_goal,
     format_portfolio,
     format_sale,
@@ -32,7 +32,6 @@ from app.bot.keyboards import (
     MENU_BUTTONS,
     PORTFOLIO_BUTTONS,
     deposit_actions_keyboard,
-    deposit_item_keyboard,
     goal_actions_keyboard,
     goal_item_keyboard,
     portfolio_actions_keyboard,
@@ -153,16 +152,9 @@ async def show_deposits(
         return
     items = await AssetService(session).deposits(user.id)
     await message.answer(
-        "🏦 <b>Депозиты</b>\nПока нет депозитов."
-        if not items
-        else "🏦 <b>Депозиты</b>",
-        reply_markup=deposit_actions_keyboard(),
+        format_deposits(items),
+        reply_markup=deposit_actions_keyboard([(item.id, item.name) for item in items]),
     )
-    for item in items:
-        await message.answer(
-            format_deposit(item),
-            reply_markup=deposit_item_keyboard(item.id),
-        )
 
 
 @router.message(Command("fingoals"))

@@ -1,8 +1,8 @@
 """Tests for human-friendly asset input formats."""
 
-from app.bot.formatters import format_goal
+from app.bot.formatters import format_deposits, format_goal
 from app.bot.handlers.assets import _goal_input
-from app.db.models import FinancialGoal
+from app.db.models import Deposit, FinancialGoal
 
 
 def test_simple_goal_input_defaults_to_zero_kzt() -> None:
@@ -46,3 +46,22 @@ def test_goal_formatter_shows_remaining_percent() -> None:
 
     assert "20.0%" in text
     assert "Осталось: 24 000 000 ₸ (80.0%)" in text
+
+
+def test_deposits_formatter_combines_items_and_total() -> None:
+    items = [
+        Deposit(id=1, user_id=1, name="Депозит 1", balance=64_800, currency="KZT"),
+        Deposit(
+            id=2,
+            user_id=1,
+            name="Депозит 2",
+            balance=2_249_866,
+            currency="KZT",
+        ),
+    ]
+
+    text = format_deposits(items)
+
+    assert "Всего: <b>2 314 666 ₸</b>" in text
+    assert "Депозит 1</b> — 64 800 ₸" in text
+    assert "Депозит 2</b> — 2 249 866 ₸" in text
