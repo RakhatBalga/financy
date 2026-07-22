@@ -1,4 +1,4 @@
-"""SQLAlchemy ORM models: User, Category, Transaction, Budget."""
+"""SQLAlchemy ORM models for transactions and personal assets."""
 
 from __future__ import annotations
 
@@ -58,6 +58,15 @@ class User(Base):
         back_populates="user", cascade="all, delete-orphan"
     )
     budgets: Mapped[list[Budget]] = relationship(
+        back_populates="user", cascade="all, delete-orphan"
+    )
+    investment_positions: Mapped[list[InvestmentPosition]] = relationship(
+        back_populates="user", cascade="all, delete-orphan"
+    )
+    deposits: Mapped[list[Deposit]] = relationship(
+        back_populates="user", cascade="all, delete-orphan"
+    )
+    financial_goals: Mapped[list[FinancialGoal]] = relationship(
         back_populates="user", cascade="all, delete-orphan"
     )
 
@@ -131,3 +140,67 @@ class Budget(Base):
 
     user: Mapped[User] = relationship(back_populates="budgets")
     category: Mapped[Category] = relationship(back_populates="budgets")
+
+
+class InvestmentPosition(Base):
+    """A stock lot tracked in shares and average USD purchase price."""
+
+    __tablename__ = "investment_positions"
+    __table_args__ = (
+        Index("ix_investment_positions_user_symbol", "user_id", "symbol"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    symbol: Mapped[str] = mapped_column(String(24), nullable=False)
+    quantity: Mapped[float] = mapped_column(Numeric(18, 6), nullable=False)
+    average_price_usd: Mapped[float] = mapped_column(Numeric(18, 4), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    user: Mapped[User] = relationship(back_populates="investment_positions")
+
+
+class Deposit(Base):
+    """A bank deposit or cash balance included in net worth."""
+
+    __tablename__ = "deposits"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    name: Mapped[str] = mapped_column(String(80), nullable=False)
+    balance: Mapped[float] = mapped_column(Numeric(18, 2), nullable=False)
+    currency: Mapped[str] = mapped_column(String(3), nullable=False)
+    annual_rate: Mapped[float | None] = mapped_column(Numeric(7, 3), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    user: Mapped[User] = relationship(back_populates="deposits")
+
+
+class FinancialGoal(Base):
+    """A savings target with a manually tracked current amount."""
+
+    __tablename__ = "financial_goals"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    title: Mapped[str] = mapped_column(String(120), nullable=False)
+    target_amount: Mapped[float] = mapped_column(Numeric(18, 2), nullable=False)
+    current_amount: Mapped[float] = mapped_column(
+        Numeric(18, 2), nullable=False, default=0
+    )
+    currency: Mapped[str] = mapped_column(String(3), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    user: Mapped[User] = relationship(back_populates="financial_goals")

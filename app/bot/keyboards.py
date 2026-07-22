@@ -10,12 +10,18 @@ from aiogram.types import (
 )
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
+from app.db.models import Category
+
 # Persistent reply-keyboard button labels. Handlers match these exact strings.
 BTN_AI = "🧠 ЖИ пікірі"
 BTN_TODAY = "📅 Бүгін"
 BTN_MONTH = "📊 Ай"
 BTN_INCOME = "💰 Кірістер"
 BTN_CHART = "📈 Диаграмма"
+BTN_PORTFOLIO = "💼 Портфель"
+BTN_DEPOSITS = "🏦 Депозиты"
+BTN_FIN_GOALS = "🎯 Финцели"
+BTN_CAPITAL = "💰 Капитал"
 
 # Legacy Russian labels: Telegram caches the reply keyboard per chat, so users
 # who haven't re-run /start since the Kazakh switch still send the old text.
@@ -32,11 +38,23 @@ TODAY_BUTTONS: frozenset[str] = frozenset({BTN_TODAY, _LEGACY_TODAY})
 MONTH_BUTTONS: frozenset[str] = frozenset({BTN_MONTH, _LEGACY_MONTH})
 INCOME_BUTTONS: frozenset[str] = frozenset({BTN_INCOME, _LEGACY_INCOME})
 CHART_BUTTONS: frozenset[str] = frozenset({BTN_CHART, _LEGACY_CHART})
+PORTFOLIO_BUTTONS: frozenset[str] = frozenset({BTN_PORTFOLIO})
+DEPOSIT_BUTTONS: frozenset[str] = frozenset({BTN_DEPOSITS})
+FIN_GOAL_BUTTONS: frozenset[str] = frozenset({BTN_FIN_GOALS})
+CAPITAL_BUTTONS: frozenset[str] = frozenset({BTN_CAPITAL})
 
 # All reply-keyboard labels — FSM "waiting for a number" states exclude these so
 # a button press is never mistaken for the typed amount.
 MENU_BUTTONS: frozenset[str] = (
-    AI_BUTTONS | TODAY_BUTTONS | MONTH_BUTTONS | INCOME_BUTTONS | CHART_BUTTONS
+    AI_BUTTONS
+    | TODAY_BUTTONS
+    | MONTH_BUTTONS
+    | INCOME_BUTTONS
+    | CHART_BUTTONS
+    | PORTFOLIO_BUTTONS
+    | DEPOSIT_BUTTONS
+    | FIN_GOAL_BUTTONS
+    | CAPITAL_BUTTONS
 )
 
 # Onboarding: housing/food cost questions asked once on first /start.
@@ -99,12 +117,12 @@ def main_reply_keyboard() -> ReplyKeyboardMarkup:
             [KeyboardButton(text=BTN_AI)],
             [KeyboardButton(text=BTN_TODAY), KeyboardButton(text=BTN_MONTH)],
             [KeyboardButton(text=BTN_INCOME), KeyboardButton(text=BTN_CHART)],
+            [KeyboardButton(text=BTN_PORTFOLIO), KeyboardButton(text=BTN_DEPOSITS)],
+            [KeyboardButton(text=BTN_FIN_GOALS), KeyboardButton(text=BTN_CAPITAL)],
         ],
         resize_keyboard=True,
         input_field_placeholder="Шығын жаз, мыс. «кофе 800»",
     )
-
-from app.db.models import Category
 
 # Callback data format: "confirm:<transaction_id>" / "recat:<transaction_id>"
 # and for the category picker: "setcat:<transaction_id>:<category_id>".
@@ -178,3 +196,82 @@ def transaction_row_keyboard(transaction_id: int) -> InlineKeyboardMarkup:
         ),
     )
     return builder.as_markup()
+
+
+ASSET_ADD_POSITION = "asset:add_position"
+ASSET_ADD_DEPOSIT = "asset:add_deposit"
+ASSET_ADD_GOAL = "asset:add_goal"
+ASSET_DELETE_PREFIX = "assetdel"
+ASSET_GOAL_UPDATE_PREFIX = "goalupd"
+ASSET_DEPOSIT_UPDATE_PREFIX = "depupd"
+
+
+def portfolio_actions_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="➕ Добавить акцию", callback_data=ASSET_ADD_POSITION)]
+        ]
+    )
+
+
+def deposit_actions_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="➕ Добавить депозит", callback_data=ASSET_ADD_DEPOSIT)]
+        ]
+    )
+
+
+def goal_actions_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="➕ Добавить цель", callback_data=ASSET_ADD_GOAL)]
+        ]
+    )
+
+
+def asset_delete_keyboard(kind: str, item_id: int) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="🗑 Удалить",
+                    callback_data=f"{ASSET_DELETE_PREFIX}:{kind}:{item_id}",
+                )
+            ]
+        ]
+    )
+
+
+def deposit_item_keyboard(deposit_id: int) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="✏️ Обновить баланс",
+                    callback_data=f"{ASSET_DEPOSIT_UPDATE_PREFIX}:{deposit_id}",
+                ),
+                InlineKeyboardButton(
+                    text="🗑 Удалить",
+                    callback_data=f"{ASSET_DELETE_PREFIX}:deposit:{deposit_id}",
+                ),
+            ]
+        ]
+    )
+
+
+def goal_item_keyboard(goal_id: int) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="✏️ Обновить накопления",
+                    callback_data=f"{ASSET_GOAL_UPDATE_PREFIX}:{goal_id}",
+                ),
+                InlineKeyboardButton(
+                    text="🗑 Удалить",
+                    callback_data=f"{ASSET_DELETE_PREFIX}:goal:{goal_id}",
+                ),
+            ]
+        ]
+    )

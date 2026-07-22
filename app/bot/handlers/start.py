@@ -14,7 +14,6 @@ from app.bot.keyboards import (
     housing_question_keyboard,
     main_reply_keyboard,
 )
-from app.db.models import User
 from app.services.user_service import UserService
 
 router = Router(name="start")
@@ -36,6 +35,10 @@ _WELCOME = (
     "/advice — айдың ЖИ талдауы мен кеңестер\n"
     "/benchmark — Қазақстан орташасымен салыстыру\n"
     "/subscriptions — тұрақты төлемдерді табу\n"
+    "/portfolio — инвестициялық портфель\n"
+    "/deposits — депозиттер\n"
+    "/fingoals — қаржылық мақсаттар\n"
+    "/capital — барлық капитал USD және KZT түрінде\n"
     "/reset — БАРЛЫҚ шығын, кіріс пен бюджетті жою"
 )
 

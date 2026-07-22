@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
-from app.db.models import Transaction
+from html import escape
+
+from app.db.models import Deposit, FinancialGoal, Transaction
 from app.services.advisor_service import RuleBreakdown
+from app.services.asset_service import PositionValue, WealthSummary
 from app.services.budget_service import BudgetAlert
 from app.services.schemas import ParsedTransaction, PeriodReport
 
@@ -11,6 +14,101 @@ from app.services.schemas import ParsedTransaction, PeriodReport
 def format_amount(value: float, currency: str) -> str:
     """Format money with a thin space thousands separator."""
     return f"{value:,.0f}".replace(",", " ") + f" {currency}"
+
+
+def format_usd(value: float) -> str:
+    sign = "-" if value < 0 else ""
+    return f"{sign}${abs(value):,.2f}"
+
+
+def format_kzt(value: float) -> str:
+    sign = "-" if value < 0 else ""
+    amount = f"{abs(value):,.0f}".replace(",", " ")
+    return f"{sign}{amount} ₸"
+
+
+def format_portfolio_header(summary: WealthSummary) -> str:
+    if not summary.positions:
+        return "💼 <b>Инвестиционный портфель</b>\nПока нет акций."
+    cost = sum(item.cost_usd for item in summary.positions)
+    profit = summary.portfolio_usd - cost
+    icon = "🟢" if profit >= 0 else "🔴"
+    return (
+        "💼 <b>Инвестиционный портфель</b>\n"
+        f"Текущая стоимость: <b>{format_usd(summary.portfolio_usd)}</b> · "
+        f"<b>{format_kzt(summary.portfolio_usd * summary.usd_kzt)}</b>\n"
+        f"{icon} Результат: {format_usd(profit)} · "
+        f"{format_kzt(profit * summary.usd_kzt)}\n"
+        f"Курс Yahoo: $1 = {summary.usd_kzt:,.2f} ₸"
+    )
+
+
+def format_position(item: PositionValue, usd_kzt: float) -> str:
+    position = item.position
+    quantity = f"{float(position.quantity):,.6f}".rstrip("0").rstrip(".")
+    lines = [
+        f"<b>{escape(position.symbol)}</b> · {quantity} шт.",
+        f"Покупка: {format_usd(float(position.average_price_usd))} за акцию",
+    ]
+    if item.current_price_usd is None:
+        lines.append("⚠️ Текущая цена недоступна, показана себестоимость")
+        lines.append(f"Себестоимость: {format_usd(item.cost_usd)}")
+    else:
+        icon = "🟢" if item.profit_usd >= 0 else "🔴"
+        lines.extend(
+            [
+                f"Сейчас: {format_usd(item.current_price_usd)} за акцию",
+                f"Стоимость: {format_usd(item.value_usd)} · "
+                f"{format_kzt(item.value_usd * usd_kzt)}",
+                f"{icon} P/L: {format_usd(item.profit_usd)} · "
+                f"{format_kzt(item.profit_usd * usd_kzt)} "
+                f"({item.profit_percent:+.1f}%)",
+            ]
+        )
+    return "\n".join(lines)
+
+
+def format_deposit(item: Deposit, usd_kzt: float | None = None) -> str:
+    balance = float(item.balance)
+    amount = format_usd(balance) if item.currency == "USD" else format_kzt(balance)
+    lines = [f"🏦 <b>{escape(item.name)}</b>", f"Баланс: {amount}"]
+    if usd_kzt is not None:
+        converted = balance * usd_kzt if item.currency == "USD" else balance / usd_kzt
+        lines.append(
+            f"Эквивалент: {format_kzt(converted) if item.currency == 'USD' else format_usd(converted)}"
+        )
+    if item.annual_rate is not None:
+        lines.append(f"Ставка: {float(item.annual_rate):g}% годовых")
+    return "\n".join(lines)
+
+
+def format_goal(item: FinancialGoal) -> str:
+    current = float(item.current_amount)
+    target = float(item.target_amount)
+    percent = current / target * 100 if target else 0
+    filled = min(10, max(0, int(percent // 10)))
+    bar = "█" * filled + "░" * (10 - filled)
+    formatter = format_usd if item.currency == "USD" else format_kzt
+    remaining = max(0, target - current)
+    return (
+        f"🎯 <b>{escape(item.title)}</b>\n"
+        f"{bar} {percent:.1f}%\n"
+        f"Накоплено: {formatter(current)} из {formatter(target)}\n"
+        f"Осталось: {formatter(remaining)}"
+    )
+
+
+def format_capital(summary: WealthSummary) -> str:
+    return (
+        "💰 <b>Общий капитал</b>\n"
+        f"<b>{format_kzt(summary.total_kzt)}</b>\n"
+        f"<b>{format_usd(summary.total_usd)}</b>\n\n"
+        f"Акции: {format_usd(summary.portfolio_usd)} · "
+        f"{format_kzt(summary.portfolio_usd * summary.usd_kzt)}\n"
+        f"Депозиты: {format_usd(summary.deposits_kzt / summary.usd_kzt)} · "
+        f"{format_kzt(summary.deposits_kzt)}\n"
+        f"Курс Yahoo: $1 = {summary.usd_kzt:,.2f} ₸"
+    )
 
 
 def format_confirmation(parsed: ParsedTransaction, currency: str) -> str:

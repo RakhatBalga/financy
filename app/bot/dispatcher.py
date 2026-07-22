@@ -9,8 +9,10 @@ from aiogram.fsm.storage.redis import RedisStorage
 
 from app.bot.handlers import build_router
 from app.bot.middlewares.db import DbSessionMiddleware
+from app.bot.middlewares.menu_state import ClearMenuStateMiddleware
 from app.core.config import settings
 from app.services.parser_service import ParserService
+from app.services.market_data import YahooFinanceService
 
 
 def create_bot() -> Bot:
@@ -32,9 +34,11 @@ def create_dispatcher() -> Dispatcher:
 
     # Shared singletons available to handlers by parameter name.
     dp["parser"] = ParserService()
+    dp["market"] = YahooFinanceService()
 
     # DB session per update, for both messages and callbacks.
     dp.message.middleware(DbSessionMiddleware())
+    dp.message.middleware(ClearMenuStateMiddleware())
     dp.callback_query.middleware(DbSessionMiddleware())
 
     dp.include_router(build_router())

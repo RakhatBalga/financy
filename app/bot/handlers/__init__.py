@@ -6,6 +6,7 @@ from aiogram import Router
 
 from app.bot.handlers import (
     advice,
+    assets,
     budget,
     chart,
     income,
@@ -34,6 +35,7 @@ def build_router() -> Router:
     root.include_router(advice.router)
     root.include_router(subscriptions.router)
     root.include_router(chart.router)
+    root.include_router(assets.router)  # asset FSM and buttons before free text
     root.include_router(manage.router)  # FSM text handler — before catch-all
     root.include_router(transactions.router)
     return root
