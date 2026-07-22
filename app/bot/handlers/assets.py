@@ -67,6 +67,38 @@ def _money(raw: str, default_currency: str = "KZT") -> tuple[float, str, bool]:
     return _number(match.group(1)), currency, match.group(2) is not None
 
 
+def _goal_input(text: str) -> tuple[str, float, float, str]:
+    """Accept both ``квартира 30000000`` and the detailed pipe format."""
+    if "|" not in text:
+        match = re.fullmatch(
+            r"\s*(?P<title>[^|\d]+?)\s+"
+            r"(?P<amount>\d[\d\s]*(?:[.,]\d+)?)\s*"
+            r"(?P<currency>KZT|USD|₸|\$)?\s*",
+            text,
+            re.IGNORECASE,
+        )
+        if match is None:
+            raise ValueError("invalid simple goal")
+        amount_text = match.group("amount")
+        if match.group("currency"):
+            amount_text += f" {match.group('currency')}"
+        target, currency, _ = _money(amount_text)
+        return match.group("title").strip(), target, 0, currency
+
+    parts = [part.strip() for part in text.split("|")]
+    if len(parts) not in {2, 3} or not parts[0]:
+        raise ValueError("invalid detailed goal")
+    target, target_currency, target_explicit = _money(parts[1])
+    if len(parts) == 3:
+        current, current_currency, current_explicit = _money(parts[2], target_currency)
+    else:
+        current, current_currency, current_explicit = 0, target_currency, False
+    currency = current_currency if current_explicit else target_currency
+    if target_explicit and current_explicit and target_currency != current_currency:
+        raise ValueError("goal currencies do not match")
+    return parts[0], target, current, currency
+
+
 async def _user(message: Message, session: AsyncSession):
     assert message.from_user is not None
     user = await UserService(session).get(message.from_user.id)
@@ -271,7 +303,9 @@ async def add_goal_start(callback: CallbackQuery, state: FSMContext) -> None:
     await callback.answer()
     if isinstance(callback.message, Message):
         await callback.message.answer(
-            "Введите цель, нужную сумму и уже накопленное:\n"
+            "Введите цель и нужную сумму:\n"
+            "<code>квартира 30000000</code>\n\n"
+            "Если уже есть накопления:\n"
             "<code>MacBook | 1500000 | 300000 KZT</code>"
         )
 
@@ -286,27 +320,15 @@ async def add_goal_finish(
     message: Message, state: FSMContext, session: AsyncSession
 ) -> None:
     assert message.text is not None
-    parts = [part.strip() for part in message.text.split("|")]
     try:
-        if len(parts) not in {2, 3} or not parts[0]:
-            raise ValueError
-        target, target_currency, target_explicit = _money(parts[1])
-        if len(parts) == 3:
-            current, current_currency, current_explicit = _money(
-                parts[2], target_currency
-            )
-        else:
-            current, current_currency, current_explicit = 0, target_currency, False
-        currency = current_currency if current_explicit else target_currency
-        if target_explicit and current_explicit and target_currency != current_currency:
-            raise ValueError
+        title, target, current, currency = _goal_input(message.text)
     except ValueError:
-        await message.answer("Формат: <code>MacBook | 1500000 | 300000 KZT</code>")
+        await message.answer("Напишите, например: <code>квартира 30000000</code>")
         return
     user = await _user(message, session)
     if user is None:
         return
-    await AssetService(session).add_goal(user.id, parts[0], target, current, currency)
+    await AssetService(session).add_goal(user.id, title, target, current, currency)
     await state.clear()
     await message.answer("✅ Финансовая цель сохранена.")
 
