@@ -206,12 +206,23 @@ ASSET_GOAL_UPDATE_PREFIX = "goalupd"
 ASSET_DEPOSIT_UPDATE_PREFIX = "depupd"
 
 
-def portfolio_actions_keyboard() -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup(
-        inline_keyboard=[
-            [InlineKeyboardButton(text="➕ Добавить акцию", callback_data=ASSET_ADD_POSITION)]
-        ]
+def portfolio_actions_keyboard(
+    positions: list[tuple[int, str]] | None = None,
+) -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    builder.row(
+        InlineKeyboardButton(
+            text="➕ Добавить акцию", callback_data=ASSET_ADD_POSITION
+        )
     )
+    for item_id, symbol in positions or []:
+        builder.button(
+            text=f"🗑 {symbol}",
+            callback_data=f"{ASSET_DELETE_PREFIX}:position:{item_id}",
+        )
+    if positions:
+        builder.adjust(1, 2)
+    return builder.as_markup()
 
 
 def deposit_actions_keyboard() -> InlineKeyboardMarkup:

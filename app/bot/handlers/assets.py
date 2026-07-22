@@ -15,8 +15,7 @@ from app.bot.formatters import (
     format_capital,
     format_deposit,
     format_goal,
-    format_portfolio_header,
-    format_position,
+    format_portfolio,
 )
 from app.bot.keyboards import (
     ASSET_ADD_DEPOSIT,
@@ -30,7 +29,6 @@ from app.bot.keyboards import (
     FIN_GOAL_BUTTONS,
     MENU_BUTTONS,
     PORTFOLIO_BUTTONS,
-    asset_delete_keyboard,
     deposit_actions_keyboard,
     deposit_item_keyboard,
     goal_actions_keyboard,
@@ -102,13 +100,11 @@ async def show_portfolio(
         await message.answer("Yahoo Finance сейчас недоступен. Попробуйте чуть позже.")
         return
     await message.answer(
-        format_portfolio_header(summary), reply_markup=portfolio_actions_keyboard()
+        format_portfolio(summary),
+        reply_markup=portfolio_actions_keyboard(
+            [(item.position.id, item.position.symbol) for item in summary.positions]
+        ),
     )
-    for item in summary.positions:
-        await message.answer(
-            format_position(item, summary.usd_kzt),
-            reply_markup=asset_delete_keyboard("position", item.position.id),
-        )
 
 
 @router.message(Command("deposits"))

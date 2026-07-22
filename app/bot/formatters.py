@@ -68,6 +68,17 @@ def format_position(item: PositionValue, usd_kzt: float) -> str:
     return "\n".join(lines)
 
 
+def format_portfolio(summary: WealthSummary) -> str:
+    """Render the entire portfolio as one compact Telegram message."""
+    parts = [format_portfolio_header(summary)]
+    if summary.positions:
+        parts.append("📊 <b>Позиции</b>")
+        parts.extend(
+            format_position(item, summary.usd_kzt) for item in summary.positions
+        )
+    return "\n\n".join(parts)
+
+
 def format_deposit(item: Deposit, usd_kzt: float | None = None) -> str:
     balance = float(item.balance)
     amount = format_usd(balance) if item.currency == "USD" else format_kzt(balance)
