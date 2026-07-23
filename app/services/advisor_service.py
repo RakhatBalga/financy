@@ -24,6 +24,7 @@ from app.services.asset_service import (
     goal_available_capital,
     goal_required_capital,
 )
+from app.services.installment_schedule import installment_schedule_summary
 
 log = structlog.get_logger(__name__)
 
@@ -413,21 +414,14 @@ class AdvisorService:
                 f"Рассрочки: остаток {installment_total:.0f} ₸ "
                 f"({components}), завершатся {end}."
             )
-            if user.installment_august_payment is not None:
-                halyk_payment = float(user.installment_halyk_monthly_payment or 0)
-                kaspi_payment = float(user.installment_august_payment)
+            kaspi_schedule = installment_schedule_summary(user, combined=False)
+            combined_schedule = installment_schedule_summary(user, combined=True)
+            if kaspi_schedule:
+                living_lines.append(f"График Kaspi: {kaspi_schedule}.")
+            if combined_schedule:
                 living_lines.append(
-                    f"Рассрочки в августе 2026: Kaspi {kaspi_payment:.0f} ₸ + "
-                    f"Halyk {halyk_payment:.0f} ₸ = "
-                    f"{kaspi_payment + halyk_payment:.0f} ₸ суммарно."
-                )
-            if user.installment_september_payment is not None:
-                halyk_payment = float(user.installment_halyk_monthly_payment or 0)
-                kaspi_payment = float(user.installment_september_payment)
-                living_lines.append(
-                    f"Рассрочки в сентябре 2026: Kaspi {kaspi_payment:.0f} ₸ + "
-                    f"Halyk {halyk_payment:.0f} ₸ = "
-                    f"{kaspi_payment + halyk_payment:.0f} ₸ суммарно."
+                    "Общая нагрузка Kaspi + Halyk по месяцам: "
+                    f"{combined_schedule}."
                 )
             if user.installment_kaspi_end_date:
                 living_lines.append(

@@ -22,6 +22,7 @@ from app.db.models import User
 from app.services.advisor_service import AdvisorService, build_asset_advice_summary
 from app.services.analytics_service import AnalyticsService
 from app.services.asset_service import AssetService
+from app.services.installment_schedule import installment_schedule_summary
 from app.services.market_data import MarketDataError, YahooFinanceService
 from app.services.user_service import UserService
 
@@ -135,26 +136,9 @@ def _profile_text(user: User) -> str:
     ]
     if installment_line:
         lines.append(installment_line)
-    if user.installment_august_payment is not None:
-        kaspi_august = float(user.installment_august_payment)
-        halyk_payment = float(user.installment_halyk_monthly_payment or 0)
-        lines.append(
-            (
-                f"Август: Kaspi {kaspi_august:,.0f} ₸ + "
-                f"Halyk {halyk_payment:,.0f} ₸ = "
-                f"{kaspi_august + halyk_payment:,.0f} ₸"
-            ).replace(",", " ")
-        )
-    if user.installment_september_payment is not None:
-        kaspi_september = float(user.installment_september_payment)
-        halyk_payment = float(user.installment_halyk_monthly_payment or 0)
-        lines.append(
-            (
-                f"Сентябрь: Kaspi {kaspi_september:,.0f} ₸ + "
-                f"Halyk {halyk_payment:,.0f} ₸ = "
-                f"{kaspi_september + halyk_payment:,.0f} ₸"
-            ).replace(",", " ")
-        )
+    combined_schedule = installment_schedule_summary(user, combined=True)
+    if combined_schedule:
+        lines.append(f"Общий график платежей: {combined_schedule}")
     lines.extend(
         [
             "",
