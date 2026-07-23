@@ -61,6 +61,11 @@ def test_profile_text_shows_official_income_and_installments() -> None:
         installment_balance_primary=517_000,
         installment_balance_secondary=356_000,
         installment_end_date=date(2027, 8, 31),
+        installment_august_payment=53_000,
+        installment_september_payment=49_000,
+        installment_kaspi_end_date=date(2027, 7, 31),
+        installment_halyk_monthly_payment=27_000,
+        installment_halyk_end_date=date(2027, 8, 31),
     )
 
     text = _profile_text(user)
@@ -68,3 +73,5 @@ def test_profile_text_shows_official_income_and_installments() -> None:
     assert "Официальный доход: 177 000 ₸" in text
     assert "Лимит ипотечного платежа: 88 500 ₸ (50%)" in text
     assert "Остаток рассрочек: 873 000 ₸ · до 08.2027" in text
+    assert "Август: Kaspi 53 000 ₸ + Halyk 27 000 ₸ = 80 000 ₸" in text
+    assert "Сентябрь: Kaspi 49 000 ₸ + Halyk 27 000 ₸ = 76 000 ₸" in text

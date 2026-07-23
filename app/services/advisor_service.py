@@ -414,15 +414,31 @@ class AdvisorService:
                 f"({components}), завершатся {end}."
             )
             if user.installment_august_payment is not None:
+                halyk_payment = float(user.installment_halyk_monthly_payment or 0)
+                kaspi_payment = float(user.installment_august_payment)
                 living_lines.append(
-                    f"Платёж по рассрочкам в августе 2026: "
-                    f"{float(user.installment_august_payment):.0f} ₸."
+                    f"Рассрочки в августе 2026: Kaspi {kaspi_payment:.0f} ₸ + "
+                    f"Halyk {halyk_payment:.0f} ₸ = "
+                    f"{kaspi_payment + halyk_payment:.0f} ₸ суммарно."
                 )
             if user.installment_september_payment is not None:
+                halyk_payment = float(user.installment_halyk_monthly_payment or 0)
+                kaspi_payment = float(user.installment_september_payment)
                 living_lines.append(
-                    f"Платёж в сентябре 2026: "
-                    f"{float(user.installment_september_payment):.0f} ₸, "
-                    "далее постепенно снижается."
+                    f"Рассрочки в сентябре 2026: Kaspi {kaspi_payment:.0f} ₸ + "
+                    f"Halyk {halyk_payment:.0f} ₸ = "
+                    f"{kaspi_payment + halyk_payment:.0f} ₸ суммарно."
+                )
+            if user.installment_kaspi_end_date:
+                living_lines.append(
+                    "Платёж Kaspi постепенно снижается и завершится "
+                    f"{user.installment_kaspi_end_date.strftime('%m.%Y')}."
+                )
+            if user.installment_halyk_end_date:
+                living_lines.append(
+                    f"Рассрочка Halyk {float(user.installment_halyk_monthly_payment or 0):.0f} "
+                    "₸/мес завершится "
+                    f"{user.installment_halyk_end_date.strftime('%m.%Y')}."
                 )
         elif user.debt_balance is not None:
             debt_line = f"Остаток долгов: {float(user.debt_balance):.0f} ₸"

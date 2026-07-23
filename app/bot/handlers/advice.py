@@ -135,6 +135,26 @@ def _profile_text(user: User) -> str:
     ]
     if installment_line:
         lines.append(installment_line)
+    if user.installment_august_payment is not None:
+        kaspi_august = float(user.installment_august_payment)
+        halyk_payment = float(user.installment_halyk_monthly_payment or 0)
+        lines.append(
+            (
+                f"Август: Kaspi {kaspi_august:,.0f} ₸ + "
+                f"Halyk {halyk_payment:,.0f} ₸ = "
+                f"{kaspi_august + halyk_payment:,.0f} ₸"
+            ).replace(",", " ")
+        )
+    if user.installment_september_payment is not None:
+        kaspi_september = float(user.installment_september_payment)
+        halyk_payment = float(user.installment_halyk_monthly_payment or 0)
+        lines.append(
+            (
+                f"Сентябрь: Kaspi {kaspi_september:,.0f} ₸ + "
+                f"Halyk {halyk_payment:,.0f} ₸ = "
+                f"{kaspi_september + halyk_payment:,.0f} ₸"
+            ).replace(",", " ")
+        )
     lines.extend(
         [
             "",

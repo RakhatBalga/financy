@@ -79,6 +79,15 @@ class User(Base):
     installment_september_payment: Mapped[float | None] = mapped_column(
         Numeric(18, 2), nullable=True
     )
+    installment_kaspi_end_date: Mapped[date | None] = mapped_column(
+        Date, nullable=True
+    )
+    installment_halyk_monthly_payment: Mapped[float | None] = mapped_column(
+        Numeric(18, 2), nullable=True
+    )
+    installment_halyk_end_date: Mapped[date | None] = mapped_column(
+        Date, nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
