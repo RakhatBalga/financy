@@ -6,7 +6,14 @@ from html import escape
 
 from app.db.models import Deposit, FinancialGoal, Transaction
 from app.services.advisor_service import RuleBreakdown
-from app.services.asset_service import PositionValue, SaleResult, WealthSummary
+from app.services.asset_service import (
+    PositionValue,
+    SaleResult,
+    WealthSummary,
+    estimated_goal_loan_payment,
+    goal_available_capital,
+    goal_required_capital,
+)
 from app.services.budget_service import BudgetAlert
 from app.services.market_data import AnalystForecast
 from app.services.schemas import ParsedTransaction, PeriodReport
@@ -260,19 +267,44 @@ def format_goal(item: FinancialGoal, current_amount: float | None = None) -> str
     current = (
         current_amount if current_amount is not None else float(item.current_amount)
     )
-    target = float(item.target_amount)
+    target = goal_required_capital(item)
     percent = current / target * 100 if target else 0
     filled = min(10, max(0, int(percent // 10)))
     bar = "█" * filled + "░" * (10 - filled)
     formatter = format_usd if item.currency == "USD" else format_kzt
     remaining = max(0, target - current)
     remaining_percent = max(0, 100 - percent)
-    return (
-        f"🎯 <b>{escape(item.title)}</b>\n"
-        f"{bar} {percent:.1f}%\n"
-        f"Накоплено: {formatter(current)} из {formatter(target)}\n"
-        f"Осталось: {formatter(remaining)} ({remaining_percent:.1f}%)"
+    lines = [f"🎯 <b>{escape(item.title)}</b>"]
+    if item.financing_program:
+        lines.extend(
+            [
+                f"Программа: <b>{escape(item.financing_program)}</b>",
+                f"Стоимость жилья: {formatter(float(item.target_amount))}",
+                f"Первоначальный взнос "
+                f"({float(item.down_payment_percent or 0):g}%): {formatter(target)}",
+            ]
+        )
+    lines.extend(
+        [
+            f"{bar} {percent:.1f}%",
+            (
+                f"Капитал без подушки: {formatter(current)}"
+                if item.financing_program
+                else f"Накоплено: {formatter(current)} из {formatter(target)}"
+            ),
+            f"Осталось: {formatter(remaining)} ({remaining_percent:.1f}%)",
+        ]
     )
+    payment = estimated_goal_loan_payment(item)
+    if payment is not None:
+        principal = float(item.target_amount) - target
+        lines.append(
+            f"Ипотека: {formatter(principal)} · "
+            f"≈ {formatter(payment)}/мес при "
+            f"{float(item.loan_annual_rate or 0):g}% на "
+            f"{item.loan_term_years} лет"
+        )
+    return "\n".join(lines)
 
 
 def format_goals(items: list[FinancialGoal], summary: WealthSummary) -> str:
@@ -286,7 +318,7 @@ def format_goals(items: list[FinancialGoal], summary: WealthSummary) -> str:
         f"<b>{format_usd(summary.total_usd)}</b>",
     ]
     for item in items:
-        current = summary.total_usd if item.currency == "USD" else summary.total_kzt
+        current = goal_available_capital(item, summary)
         parts.append(format_goal(item, current))
     return "\n\n".join(parts)
 

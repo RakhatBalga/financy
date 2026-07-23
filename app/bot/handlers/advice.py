@@ -39,6 +39,12 @@ _RISK_LEVELS = {
     "высокая": "высокий",
     "high": "высокий",
 }
+_OBLIGATION_TYPES = {
+    "кредит": "кредиты",
+    "кредиты": "кредиты",
+    "рассрочка": "рассрочки",
+    "рассрочки": "рассрочки",
+}
 
 
 def _optional_number(raw: str) -> float | None:
@@ -48,20 +54,32 @@ def _optional_number(raw: str) -> float | None:
     return float(value.replace(" ", "").replace(",", "."))
 
 
-def _profile_input(raw: str) -> tuple[int, float | None, float | None, str | None]:
+def _profile_input(
+    raw: str,
+) -> tuple[int, float | None, float | None, str | None, str | None]:
     parts = [part.strip() for part in raw.split("|")]
-    if len(parts) not in {1, 4}:
+    if len(parts) not in {1, 4, 5}:
         raise ValueError
     age = int(parts[0])
     if len(parts) == 1:
-        return age, None, None, None
+        return age, None, None, None, None
     debt_balance = _optional_number(parts[1])
     debt_rate = _optional_number(parts[2])
     risk_raw = parts[3].casefold()
     risk = None if risk_raw in {"", "-", "не знаю"} else _RISK_LEVELS.get(risk_raw)
     if risk_raw not in {"", "-", "не знаю"} and risk is None:
         raise ValueError
-    return age, debt_balance, debt_rate, risk
+    obligation = None
+    if len(parts) == 5:
+        obligation_raw = parts[4].casefold()
+        obligation = (
+            None
+            if obligation_raw in {"", "-", "не знаю"}
+            else _OBLIGATION_TYPES.get(obligation_raw)
+        )
+        if obligation_raw not in {"", "-", "не знаю"} and obligation is None:
+            raise ValueError
+    return age, debt_balance, debt_rate, risk, obligation
 
 
 def _profile_text(user: User) -> str:
@@ -80,8 +98,10 @@ def _profile_text(user: User) -> str:
         f"Возраст: {user.age or 'не указан'}\n"
         f"Остаток долгов: {debt}\n"
         f"Максимальная ставка: {rate}\n"
+        f"Тип обязательств: {user.obligation_type or 'не указан'}\n"
         f"Отношение к риску: {user.risk_tolerance or 'не указано'}\n\n"
-        "Обновить: <code>/profile 21 | 3500000 | 19.5 | средний</code>\n"
+        "Обновить: "
+        "<code>/profile 21 | 3500000 | 19.5 | средний | рассрочки</code>\n"
         "Неизвестное значение можно заменить на <code>-</code>."
     )
 
@@ -107,7 +127,7 @@ async def cmd_profile(
         await message.answer(_profile_text(user))
         return
     try:
-        age, debt_balance, debt_rate, risk = _profile_input(command.args)
+        age, debt_balance, debt_rate, risk, obligation = _profile_input(command.args)
         if "|" not in command.args:
             debt_balance = (
                 float(user.debt_balance) if user.debt_balance is not None else None
@@ -118,17 +138,21 @@ async def cmd_profile(
                 else None
             )
             risk = user.risk_tolerance
+            obligation = user.obligation_type
         await UserService(session).set_financial_profile(
             user,
             age=age,
             debt_balance=debt_balance,
             debt_annual_rate=debt_rate,
             risk_tolerance=risk,
+            obligation_type=obligation,
         )
     except ValueError:
         await message.answer(
-            "Формат: <code>/profile 21 | 3500000 | 19.5 | средний</code>\n"
-            "Риск: низкий, средний или высокий. Неизвестное значение: <code>-</code>."
+            "Формат: "
+            "<code>/profile 21 | 3500000 | 19.5 | средний | рассрочки</code>\n"
+            "Риск: низкий, средний или высокий. Тип: кредиты или рассрочки. "
+            "Неизвестное значение: <code>-</code>."
         )
         return
     await message.answer("✅ Профиль сохранён.\n\n" + _profile_text(user))

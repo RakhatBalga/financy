@@ -11,14 +11,15 @@ from app.services.user_service import UserService
 
 
 def test_profile_input_accepts_age_only_and_full_profile() -> None:
-    assert _profile_input("21") == (21, None, None, None)
-    assert _profile_input("21 | 3 500 000 | 19,5 | средний") == (
+    assert _profile_input("21") == (21, None, None, None, None)
+    assert _profile_input("21 | 3 500 000 | 19,5 | средний | рассрочки") == (
         21,
         3_500_000,
         19.5,
         "средний",
+        "рассрочки",
     )
-    assert _profile_input("21 | - | - | -") == (21, None, None, None)
+    assert _profile_input("21 | - | - | -") == (21, None, None, None, None)
 
 
 def test_profile_input_rejects_unknown_risk() -> None:
@@ -36,6 +37,7 @@ async def test_financial_profile_is_persisted(
         debt_balance=3_500_000,
         debt_annual_rate=19.5,
         risk_tolerance="средний",
+        obligation_type="рассрочки",
     )
 
     await session.refresh(user)
@@ -44,3 +46,4 @@ async def test_financial_profile_is_persisted(
     assert float(user.debt_balance or 0) == pytest.approx(3_500_000)
     assert float(user.debt_annual_rate or 0) == pytest.approx(19.5)
     assert user.risk_tolerance == "средний"
+    assert user.obligation_type == "рассрочки"

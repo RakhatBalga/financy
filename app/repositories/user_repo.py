@@ -56,9 +56,11 @@ class UserRepository:
         debt_balance: float | None,
         debt_annual_rate: float | None,
         risk_tolerance: str | None,
+        obligation_type: str | None,
     ) -> None:
         user.age = age
         user.debt_balance = debt_balance
         user.debt_annual_rate = debt_annual_rate
         user.risk_tolerance = risk_tolerance
+        user.obligation_type = obligation_type
         await self._session.flush()

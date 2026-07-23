@@ -52,6 +52,7 @@ class User(Base):
     debt_annual_rate: Mapped[float | None] = mapped_column(
         Numeric(7, 3), nullable=True
     )
+    obligation_type: Mapped[str | None] = mapped_column(String(24), nullable=True)
     risk_tolerance: Mapped[str | None] = mapped_column(String(16), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
@@ -213,6 +214,14 @@ class FinancialGoal(Base):
         Numeric(18, 2), nullable=False, default=0
     )
     currency: Mapped[str] = mapped_column(String(3), nullable=False)
+    financing_program: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    down_payment_percent: Mapped[float | None] = mapped_column(
+        Numeric(7, 3), nullable=True
+    )
+    loan_annual_rate: Mapped[float | None] = mapped_column(
+        Numeric(7, 3), nullable=True
+    )
+    loan_term_years: Mapped[int | None] = mapped_column(Integer, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

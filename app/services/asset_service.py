@@ -96,6 +96,51 @@ class DepositInterestAccrual:
     months: int
 
 
+def emergency_reserve_kzt(summary: WealthSummary) -> float:
+    return sum(
+        float(item.balance) * (summary.usd_kzt if item.currency == "USD" else 1)
+        for item in summary.deposits
+        if any(
+            marker in item.name.casefold()
+            for marker in ("чёрн", "черн", "резерв", "подуш")
+        )
+    )
+
+
+def goal_required_capital(goal: FinancialGoal) -> float:
+    target = float(goal.target_amount)
+    if goal.down_payment_percent is None:
+        return target
+    return target * float(goal.down_payment_percent) / 100
+
+
+def goal_available_capital(goal: FinancialGoal, summary: WealthSummary) -> float:
+    total = summary.total_usd if goal.currency == "USD" else summary.total_kzt
+    if goal.down_payment_percent is None:
+        return total
+    reserve_kzt = emergency_reserve_kzt(summary)
+    reserve = reserve_kzt / summary.usd_kzt if goal.currency == "USD" else reserve_kzt
+    return max(0, total - reserve)
+
+
+def estimated_goal_loan_payment(goal: FinancialGoal) -> float | None:
+    if (
+        goal.down_payment_percent is None
+        or goal.loan_annual_rate is None
+        or goal.loan_term_years is None
+    ):
+        return None
+    principal = float(goal.target_amount) - goal_required_capital(goal)
+    months = int(goal.loan_term_years) * 12
+    if principal <= 0 or months <= 0:
+        return None
+    monthly_rate = float(goal.loan_annual_rate) / 1200
+    if monthly_rate == 0:
+        return principal / months
+    growth = (1 + monthly_rate) ** months
+    return principal * monthly_rate * growth / (growth - 1)
+
+
 def _add_months(value: date, months: int) -> date:
     month_index = value.month - 1 + months
     year = value.year + month_index // 12

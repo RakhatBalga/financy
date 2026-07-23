@@ -79,6 +79,7 @@ class UserService:
         debt_balance: float | None,
         debt_annual_rate: float | None,
         risk_tolerance: str | None,
+        obligation_type: str | None,
     ) -> None:
         if age < 14 or age > 100:
             raise ValueError("invalid age")
@@ -88,12 +89,15 @@ class UserService:
             raise ValueError("invalid debt rate")
         if risk_tolerance not in {None, "низкий", "средний", "высокий"}:
             raise ValueError("invalid risk tolerance")
+        if obligation_type not in {None, "кредиты", "рассрочки"}:
+            raise ValueError("invalid obligation type")
         await self._users.set_financial_profile(
             user,
             age=age,
             debt_balance=debt_balance,
             debt_annual_rate=debt_annual_rate,
             risk_tolerance=risk_tolerance,
+            obligation_type=obligation_type,
         )
         await self._session.commit()
         log.info("financial_profile_set", user_id=user.id)

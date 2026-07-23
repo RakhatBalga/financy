@@ -17,7 +17,13 @@ from app.repositories.category_repo import CategoryRepository
 from app.repositories.transaction_repo import TransactionRepository
 from app.services import benchmarks, gemini, periods
 from app.services.analytics_service import AnalyticsService
-from app.services.asset_service import WealthSummary
+from app.services.asset_service import (
+    WealthSummary,
+    emergency_reserve_kzt,
+    estimated_goal_loan_payment,
+    goal_available_capital,
+    goal_required_capital,
+)
 
 log = structlog.get_logger(__name__)
 
@@ -150,12 +156,18 @@ _COMPACT_ADVICE_SYSTEM = """
 - Ежемесячный платёж по кредиту — это нагрузка на денежный поток, но не размер
   долга. Не называй долг большим и не советуй досрочное погашение, если остаток
   и ставка неизвестны.
+- Если профиль говорит "рассрочки", называй их рассрочками, не кредитами.
+  Не считай их дорогим долгом без явно указанной ставки или переплаты.
 - Если ставка долга известна, сравни её с гарантированной доходностью депозита
   и ценностью ликвидной подушки. Рассрочку 0% не советуй срочно закрывать.
 - Молодой возраст сам по себе не означает высокую терпимость к риску. Горизонт
   цели и указанный профиль риска важнее.
 - Считай подушкой только депозит, явно отмеченный как резерв/на чёрный день,
   а не все депозиты и инвестиции.
+- Для ипотечной цели оцени отдельно готовность первоначального взноса и долю
+  будущего платежа в доходе. Не говори, что надо накопить полную цену квартиры.
+- Параметры 7-20-25: жильё только первичное, ставка 7%, взнос от 20%, срок до
+  25 лет. Одобрение и доступность программы всё равно проверяет банк.
 - Используй только Telegram HTML <b>, без markdown.
 """.strip()
 
@@ -202,14 +214,7 @@ def build_asset_advice_summary(
         f"- Структура капитала: депозиты {deposits_share:.1f}%, "
         f"брокерский счёт {broker_share:.1f}%.",
     ]
-    emergency_kzt = sum(
-        float(item.balance) * (summary.usd_kzt if item.currency == "USD" else 1)
-        for item in summary.deposits
-        if any(
-            marker in item.name.casefold()
-            for marker in ("чёрн", "черн", "резерв", "подуш")
-        )
-    )
+    emergency_kzt = emergency_reserve_kzt(summary)
     if emergency_kzt:
         lines.append(
             f"- Отдельный неприкосновенный резерв: {emergency_kzt:.0f} KZT."
@@ -231,14 +236,33 @@ def build_asset_advice_summary(
         )
         lines.append(f"- Позиции: {positions}.")
     for goal in goals:
-        current = summary.total_usd if goal.currency == "USD" else summary.total_kzt
-        target = float(goal.target_amount)
+        current = goal_available_capital(goal, summary)
+        target = goal_required_capital(goal)
         progress = current / target * 100 if target else 0
-        lines.append(
-            f"- Цель {goal.title}: {progress:.1f}% выполнено, "
-            f"осталось {max(0, target - current):.0f} {goal.currency} "
-            f"({max(0, 100 - progress):.1f}%)."
-        )
+        if goal.financing_program:
+            payment = estimated_goal_loan_payment(goal)
+            loan = float(goal.target_amount) - target
+            lines.append(
+                f"- Цель {goal.title} по программе {goal.financing_program}: "
+                f"цена {float(goal.target_amount):.0f} {goal.currency}, "
+                f"первоначальный взнос {target:.0f} {goal.currency}, "
+                f"капитал без аварийного резерва {current:.0f} {goal.currency}, "
+                f"готовность взноса {progress:.1f}%, "
+                f"осталось {max(0, target - current):.0f} {goal.currency}."
+            )
+            if payment is not None:
+                lines.append(
+                    f"- Расчёт ипотеки: сумма {loan:.0f} {goal.currency}, "
+                    f"ориентировочный платёж {payment:.0f} {goal.currency}/мес "
+                    f"при {float(goal.loan_annual_rate or 0):g}% на "
+                    f"{goal.loan_term_years} лет."
+                )
+        else:
+            lines.append(
+                f"- Цель {goal.title}: {progress:.1f}% выполнено, "
+                f"осталось {max(0, target - current):.0f} {goal.currency} "
+                f"({max(0, 100 - progress):.1f}%)."
+            )
     return "\n".join(lines)
 
 
@@ -335,6 +359,8 @@ class AdvisorService:
             "Финансовый риск: "
             f"{user.risk_tolerance if user.risk_tolerance else 'не указан'}.",
         ]
+        if user.obligation_type:
+            living_lines.append(f"Тип текущих обязательств: {user.obligation_type}.")
         if user.debt_balance is not None:
             debt_line = f"Остаток долгов: {float(user.debt_balance):.0f} ₸"
             if user.debt_annual_rate is not None:
