@@ -93,17 +93,57 @@ def _profile_text(user: User) -> str:
         if user.debt_annual_rate is not None
         else "не указана"
     )
-    return (
-        "👤 <b>Финансовый профиль</b>\n"
-        f"Возраст: {user.age or 'не указан'}\n"
-        f"Остаток долгов: {debt}\n"
-        f"Максимальная ставка: {rate}\n"
-        f"Тип обязательств: {user.obligation_type or 'не указан'}\n"
-        f"Отношение к риску: {user.risk_tolerance or 'не указано'}\n\n"
-        "Обновить: "
-        "<code>/profile 21 | 3500000 | 19.5 | средний | рассрочки</code>\n"
-        "Неизвестное значение можно заменить на <code>-</code>."
+    salary = float(user.official_salary_monthly or 0)
+    stipend = float(user.official_stipend_monthly or 0)
+    official_income = salary + stipend
+    payment_limit = (
+        official_income * float(user.mortgage_payment_limit_percent) / 100
+        if official_income and user.mortgage_payment_limit_percent is not None
+        else 0
     )
+    installment_total = float(user.installment_balance_primary or 0) + float(
+        user.installment_balance_secondary or 0
+    )
+    official_line = "Официальный доход: не указан"
+    if official_income:
+        official_line = (
+            f"Официальный доход: {official_income:,.0f} ₸"
+            f" ({salary:,.0f} ₸ зарплата + {stipend:,.0f} ₸ стипендия)"
+        ).replace(",", " ")
+    limit_line = "Лимит ипотечного платежа: не указан"
+    if payment_limit:
+        limit_line = (
+            f"Лимит ипотечного платежа: {payment_limit:,.0f} ₸ "
+            f"({float(user.mortgage_payment_limit_percent):g}%)"
+        ).replace(",", " ")
+    installment_line = ""
+    if installment_total and user.installment_end_date:
+        installment_line = (
+            f"Остаток рассрочек: {installment_total:,.0f} ₸ · до "
+            f"{user.installment_end_date.strftime('%m.%Y')}"
+        ).replace(",", " ")
+    lines = [
+        "👤 <b>Финансовый профиль</b>",
+        f"Возраст: {user.age or 'не указан'}",
+        f"Остаток долгов: {debt}",
+        f"Максимальная ставка: {rate}",
+        f"Тип обязательств: {user.obligation_type or 'не указан'}",
+        f"Отношение к риску: {user.risk_tolerance or 'не указано'}",
+        "",
+        official_line,
+        limit_line,
+    ]
+    if installment_line:
+        lines.append(installment_line)
+    lines.extend(
+        [
+            "",
+            "Обновить: "
+            "<code>/profile 21 | 3500000 | 19.5 | средний | рассрочки</code>",
+            "Неизвестное значение можно заменить на <code>-</code>.",
+        ]
+    )
+    return "\n".join(lines)
 
 
 async def _require_user(message: Message, session: AsyncSession) -> User | None:

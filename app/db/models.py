@@ -54,6 +54,31 @@ class User(Base):
     )
     obligation_type: Mapped[str | None] = mapped_column(String(24), nullable=True)
     risk_tolerance: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    official_salary_monthly: Mapped[float | None] = mapped_column(
+        Numeric(18, 2), nullable=True
+    )
+    official_stipend_monthly: Mapped[float | None] = mapped_column(
+        Numeric(18, 2), nullable=True
+    )
+    mortgage_payment_limit_percent: Mapped[float | None] = mapped_column(
+        Numeric(7, 3), nullable=True
+    )
+    salary_day: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    salary_weekend_rule: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    stipend_timing: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    installment_balance_primary: Mapped[float | None] = mapped_column(
+        Numeric(18, 2), nullable=True
+    )
+    installment_balance_secondary: Mapped[float | None] = mapped_column(
+        Numeric(18, 2), nullable=True
+    )
+    installment_end_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    installment_august_payment: Mapped[float | None] = mapped_column(
+        Numeric(18, 2), nullable=True
+    )
+    installment_september_payment: Mapped[float | None] = mapped_column(
+        Numeric(18, 2), nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

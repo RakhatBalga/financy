@@ -143,13 +143,21 @@ def test_mortgage_goal_tracks_down_payment_and_estimated_payment() -> None:
     )
     summary = WealthSummary([], [regular, reserve], 500)
 
-    text = format_goals([goal], summary)
+    text = format_goals(
+        [goal],
+        summary,
+        official_monthly_income=177_000,
+        payment_limit_percent=50,
+    )
     advice_context = build_asset_advice_summary(summary, [goal])
 
     assert "Первоначальный взнос (20%): 6 000 000 ₸" in text
     assert "Капитал без подушки: 5 000 000 ₸" in text
     assert "Осталось: 1 000 000 ₸ (16.7%)" in text
     assert "≈ 169 627 ₸/мес при 7% на 25 лет" in text
+    assert "Ваш лимит: 88 500 ₸/мес" in text
+    assert "Платёж выше лимита на 81 127 ₸" in text
+    assert "официальный доход ≈ 339 254 ₸/мес" in text
     assert "готовность взноса 83.3%" in advice_context
     assert "ориентировочный платёж 169627 KZT/мес" in advice_context
 

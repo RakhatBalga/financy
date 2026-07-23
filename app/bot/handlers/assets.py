@@ -200,7 +200,15 @@ async def show_goals(
         )
         return
     await message.answer(
-        format_goals(items, summary),
+        format_goals(
+            items,
+            summary,
+            float(user.official_salary_monthly or 0)
+            + float(user.official_stipend_monthly or 0),
+            float(user.mortgage_payment_limit_percent)
+            if user.mortgage_payment_limit_percent is not None
+            else None,
+        ),
         reply_markup=goal_actions_keyboard([(item.id, item.title) for item in items]),
     )
 

@@ -263,7 +263,12 @@ def format_deposits(
     return "\n".join(lines)
 
 
-def format_goal(item: FinancialGoal, current_amount: float | None = None) -> str:
+def format_goal(
+    item: FinancialGoal,
+    current_amount: float | None = None,
+    official_monthly_income: float | None = None,
+    payment_limit_percent: float | None = None,
+) -> str:
     current = (
         current_amount if current_amount is not None else float(item.current_amount)
     )
@@ -304,10 +309,30 @@ def format_goal(item: FinancialGoal, current_amount: float | None = None) -> str
             f"{float(item.loan_annual_rate or 0):g}% на "
             f"{item.loan_term_years} лет"
         )
+        if official_monthly_income and payment_limit_percent:
+            payment_limit = official_monthly_income * payment_limit_percent / 100
+            required_income = payment * 100 / payment_limit_percent
+            gap = max(0, payment - payment_limit)
+            lines.append(
+                f"Ваш лимит: {formatter(payment_limit)}/мес "
+                f"({payment_limit_percent:g}% от официальных "
+                f"{formatter(official_monthly_income)})"
+            )
+            if gap:
+                lines.append(
+                    f"Платёж выше лимита на {formatter(gap)} · "
+                    f"нужен официальный доход ≈ {formatter(required_income)}/мес "
+                    "либо больший взнос"
+                )
     return "\n".join(lines)
 
 
-def format_goals(items: list[FinancialGoal], summary: WealthSummary) -> str:
+def format_goals(
+    items: list[FinancialGoal],
+    summary: WealthSummary,
+    official_monthly_income: float | None = None,
+    payment_limit_percent: float | None = None,
+) -> str:
     """Render every goal against the user's complete current net worth."""
     if not items:
         return "🎯 <b>Финансовые цели</b>\nПока нет целей."
@@ -319,7 +344,14 @@ def format_goals(items: list[FinancialGoal], summary: WealthSummary) -> str:
     ]
     for item in items:
         current = goal_available_capital(item, summary)
-        parts.append(format_goal(item, current))
+        parts.append(
+            format_goal(
+                item,
+                current,
+                official_monthly_income,
+                payment_limit_percent,
+            )
+        )
     return "\n\n".join(parts)
 
 

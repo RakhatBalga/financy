@@ -166,6 +166,13 @@ _COMPACT_ADVICE_SYSTEM = """
   а не все депозиты и инвестиции.
 - Для ипотечной цели оцени отдельно готовность первоначального взноса и долю
   будущего платежа в доходе. Не говори, что надо накопить полную цену квартиры.
+- Доступность ипотеки считай только от официального дохода из профиля. Помощь
+  родителей и прочие неофициальные поступления учитывай в бытовом бюджете, но
+  не используй для банковского лимита.
+- Если указан личный предел ипотечного платежа, сравни расчётный платёж именно
+  с ним. Покажи разницу и требуемый официальный доход либо больший взнос.
+- Учитывай срок окончания рассрочек: до этой даты они нагружают денежный поток
+  и могут влиять на оценку платёжеспособности банком, даже если ставка нулевая.
 - Параметры 7-20-25: жильё только первичное, ставка 7%, взнос от 20%, срок до
   25 лет. Одобрение и доступность программы всё равно проверяет банк.
 - Используй только Telegram HTML <b>, без markdown.
@@ -361,14 +368,70 @@ class AdvisorService:
         ]
         if user.obligation_type:
             living_lines.append(f"Тип текущих обязательств: {user.obligation_type}.")
-        if user.debt_balance is not None:
+        official_salary = float(user.official_salary_monthly or 0)
+        official_stipend = float(user.official_stipend_monthly or 0)
+        official_income = official_salary + official_stipend
+        if official_income:
+            living_lines.append(
+                f"Официальный доход для ипотеки: {official_income:.0f} ₸/мес "
+                f"({official_salary:.0f} ₸ зарплата + "
+                f"{official_stipend:.0f} ₸ стипендия)."
+            )
+            living_lines.append(
+                "Остальные поступления — помощь родителей/неофициальные; "
+                "не учитывать их в ипотечной платёжеспособности."
+            )
+        if user.mortgage_payment_limit_percent is not None and official_income:
+            limit_percent = float(user.mortgage_payment_limit_percent)
+            living_lines.append(
+                f"Личный предел ипотечного платежа: {limit_percent:g}% "
+                f"официального дохода = "
+                f"{official_income * limit_percent / 100:.0f} ₸/мес."
+            )
+        if user.salary_day:
+            timing = f"Зарплата обычно {user.salary_day}-го числа"
+            if user.salary_weekend_rule == "next_monday":
+                timing += ", если это выходной — в следующий понедельник"
+            living_lines.append(timing + ".")
+        if user.stipend_timing:
+            living_lines.append(f"Стипендия: {user.stipend_timing}.")
+
+        installment_total = float(user.installment_balance_primary or 0) + float(
+            user.installment_balance_secondary or 0
+        )
+        if installment_total:
+            components = (
+                f"{float(user.installment_balance_primary or 0):.0f} + "
+                f"{float(user.installment_balance_secondary or 0):.0f} ₸"
+            )
+            end = (
+                user.installment_end_date.strftime("%m.%Y")
+                if user.installment_end_date
+                else "дата не указана"
+            )
+            living_lines.append(
+                f"Рассрочки: остаток {installment_total:.0f} ₸ "
+                f"({components}), завершатся {end}."
+            )
+            if user.installment_august_payment is not None:
+                living_lines.append(
+                    f"Платёж по рассрочкам в августе 2026: "
+                    f"{float(user.installment_august_payment):.0f} ₸."
+                )
+            if user.installment_september_payment is not None:
+                living_lines.append(
+                    f"Платёж в сентябре 2026: "
+                    f"{float(user.installment_september_payment):.0f} ₸, "
+                    "далее постепенно снижается."
+                )
+        elif user.debt_balance is not None:
             debt_line = f"Остаток долгов: {float(user.debt_balance):.0f} ₸"
             if user.debt_annual_rate is not None:
                 debt_line += (
                     f", максимальная ставка {float(user.debt_annual_rate):g}% годовых"
                 )
             living_lines.append(debt_line + ".")
-        else:
+        elif user.obligation_type != "рассрочки":
             living_lines.append(
                 "Остаток долгов и ставки не указаны: нельзя делать вывод "
                 "о размере долга или выгоде досрочного погашения."
