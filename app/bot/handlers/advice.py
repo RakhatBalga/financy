@@ -8,7 +8,7 @@ import re
 import structlog
 from aiogram import F, Router
 from aiogram.exceptions import TelegramBadRequest
-from aiogram.filters import Command
+from aiogram.filters import Command, CommandObject
 from aiogram.types import Message
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -28,6 +28,63 @@ from app.services.user_service import UserService
 router = Router(name="advice")
 log = structlog.get_logger(__name__)
 
+_RISK_LEVELS = {
+    "низкий": "низкий",
+    "низкая": "низкий",
+    "low": "низкий",
+    "средний": "средний",
+    "средняя": "средний",
+    "medium": "средний",
+    "высокий": "высокий",
+    "высокая": "высокий",
+    "high": "высокий",
+}
+
+
+def _optional_number(raw: str) -> float | None:
+    value = raw.strip()
+    if value in {"", "-", "нет", "не знаю"}:
+        return None
+    return float(value.replace(" ", "").replace(",", "."))
+
+
+def _profile_input(raw: str) -> tuple[int, float | None, float | None, str | None]:
+    parts = [part.strip() for part in raw.split("|")]
+    if len(parts) not in {1, 4}:
+        raise ValueError
+    age = int(parts[0])
+    if len(parts) == 1:
+        return age, None, None, None
+    debt_balance = _optional_number(parts[1])
+    debt_rate = _optional_number(parts[2])
+    risk_raw = parts[3].casefold()
+    risk = None if risk_raw in {"", "-", "не знаю"} else _RISK_LEVELS.get(risk_raw)
+    if risk_raw not in {"", "-", "не знаю"} and risk is None:
+        raise ValueError
+    return age, debt_balance, debt_rate, risk
+
+
+def _profile_text(user: User) -> str:
+    debt = (
+        f"{float(user.debt_balance):,.0f} ₸".replace(",", " ")
+        if user.debt_balance is not None
+        else "не указан"
+    )
+    rate = (
+        f"{float(user.debt_annual_rate):g}%"
+        if user.debt_annual_rate is not None
+        else "не указана"
+    )
+    return (
+        "👤 <b>Финансовый профиль</b>\n"
+        f"Возраст: {user.age or 'не указан'}\n"
+        f"Остаток долгов: {debt}\n"
+        f"Максимальная ставка: {rate}\n"
+        f"Отношение к риску: {user.risk_tolerance or 'не указано'}\n\n"
+        "Обновить: <code>/profile 21 | 3500000 | 19.5 | средний</code>\n"
+        "Неизвестное значение можно заменить на <code>-</code>."
+    )
+
 
 async def _require_user(message: Message, session: AsyncSession) -> User | None:
     assert message.from_user is not None
@@ -35,6 +92,46 @@ async def _require_user(message: Message, session: AsyncSession) -> User | None:
     if user is None:
         await message.answer("Алдымен /start басыңыз.")
     return user
+
+
+@router.message(Command("profile"))
+async def cmd_profile(
+    message: Message,
+    command: CommandObject,
+    session: AsyncSession,
+) -> None:
+    user = await _require_user(message, session)
+    if user is None:
+        return
+    if not command.args:
+        await message.answer(_profile_text(user))
+        return
+    try:
+        age, debt_balance, debt_rate, risk = _profile_input(command.args)
+        if "|" not in command.args:
+            debt_balance = (
+                float(user.debt_balance) if user.debt_balance is not None else None
+            )
+            debt_rate = (
+                float(user.debt_annual_rate)
+                if user.debt_annual_rate is not None
+                else None
+            )
+            risk = user.risk_tolerance
+        await UserService(session).set_financial_profile(
+            user,
+            age=age,
+            debt_balance=debt_balance,
+            debt_annual_rate=debt_rate,
+            risk_tolerance=risk,
+        )
+    except ValueError:
+        await message.answer(
+            "Формат: <code>/profile 21 | 3500000 | 19.5 | средний</code>\n"
+            "Риск: низкий, средний или высокий. Неизвестное значение: <code>-</code>."
+        )
+        return
+    await message.answer("✅ Профиль сохранён.\n\n" + _profile_text(user))
 
 
 @router.message(Command("rule"))

@@ -40,6 +40,7 @@ _BOT_COMMANDS = [
     BotCommand(command="income", description="Кірісті көрсету"),
     BotCommand(command="rule", description="50/30/20 ережесі"),
     BotCommand(command="advice", description="Айдың ЖИ талдауы"),
+    BotCommand(command="profile", description="Қаржылық профиль"),
     BotCommand(command="benchmark", description="ҚР орташасымен салыстыру"),
     BotCommand(command="subscriptions", description="Жазылымдарды табу"),
     BotCommand(command="reset", description="Барлық шығын мен бюджетті жою"),

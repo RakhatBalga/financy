@@ -70,3 +70,30 @@ class UserService:
             housing_is_free=housing_is_free,
             food_is_free=food_is_free,
         )
+
+    async def set_financial_profile(
+        self,
+        user: User,
+        *,
+        age: int,
+        debt_balance: float | None,
+        debt_annual_rate: float | None,
+        risk_tolerance: str | None,
+    ) -> None:
+        if age < 14 or age > 100:
+            raise ValueError("invalid age")
+        if debt_balance is not None and debt_balance < 0:
+            raise ValueError("invalid debt balance")
+        if debt_annual_rate is not None and not 0 <= debt_annual_rate <= 100:
+            raise ValueError("invalid debt rate")
+        if risk_tolerance not in {None, "низкий", "средний", "высокий"}:
+            raise ValueError("invalid risk tolerance")
+        await self._users.set_financial_profile(
+            user,
+            age=age,
+            debt_balance=debt_balance,
+            debt_annual_rate=debt_annual_rate,
+            risk_tolerance=risk_tolerance,
+        )
+        await self._session.commit()
+        log.info("financial_profile_set", user_id=user.id)

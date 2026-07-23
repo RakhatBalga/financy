@@ -107,34 +107,55 @@ _ADVICE_SYSTEM = """
 _COMPACT_ADVICE_SYSTEM = """
 Ты — спокойный и честный финансовый советник. Пользователь из Казахстана.
 На входе будут расходы и доходы за месяц, депозиты, инвестиционный портфель,
-реализованный и нереализованный P/L, общий капитал и финансовые цели.
+реализованный и нереализованный P/L, общий капитал, финансовые цели и профиль.
 
-Ответь ПО-РУССКИ, коротко и конкретно, только в таком формате:
+Ответь ПО-РУССКИ, подробно, но без воды, только в таком формате:
 
 <b>Общая картина</b>
 2-3 предложения: оцени устойчивость положения, баланс доходов и расходов,
-размер капитала и главную сильную/слабую сторону.
+размер капитала и главную сильную/слабую сторону. Возраст и допустимый риск
+учитывай только когда они указаны.
 
 <b>Деньги за месяц</b>
 2 коротких пункта про доходы, обязательные и необязательные расходы, баланс
 и норму сбережений. Назови ключевые суммы, но не переписывай всю сводку.
 
+<b>Подушка и долги</b>
+2 коротких пункта:
+• сколько месяцев обязательных расходов покрывает именно отмеченный резерв;
+• оцени долговую нагрузку только по известным остатку долга и ставке.
+
 <b>Капитал и инвестиции</b>
 4 коротких пункта:
-• доля депозитов и брокерского счёта, запас стабильности;
-• концентрация и риск портфеля, отметь наиболее сильные и слабые позиции;
+• доля депозитов и брокерского счёта;
+• концентрация по весам позиций, а не по размеру их прибыли или убытка;
 • реализованный, нереализованный и общий P/L — объясни разницу простыми словами;
-• прогресс финансовой цели, сколько процентов и денег осталось, реалистичность темпа.
+• не трактуй просадку позиции как самостоятельную причину её продавать.
+
+<b>Финансовая цель</b>
+Покажи процент и сумму до цели. Оцени простой срок при текущем месячном темпе
+накоплений и прямо подпиши, что это линейная оценка без доходности, инфляции
+и роста цены цели. Если данных недостаточно — назови, чего именно не хватает.
 
 <b>Следующий шаг</b>
-Два конкретных действия: одно по текущим расходам/накоплениям, второе по
-структуре капитала или управлению риском. Без команды покупать или продавать.
+Два конкретных действия с суммами или измеримым результатом.
 
 Правила:
-- Весь ответ — примерно 1200-1600 символов и строго короче 1800 символов.
+- Весь ответ — примерно 1600-2200 символов и строго короче 2500 символов.
 - Используй достаточно цифр для аргументации, но не повторяй всю сводку.
 - Не обещай доходность и не выдумывай данные.
 - Не давай категоричных команд покупать или продавать конкретную акцию.
+- Падение цены покупки не означает, что актив нужно продавать. Обсуждай вес,
+  диверсификацию и соответствие риску.
+- Ежемесячный платёж по кредиту — это нагрузка на денежный поток, но не размер
+  долга. Не называй долг большим и не советуй досрочное погашение, если остаток
+  и ставка неизвестны.
+- Если ставка долга известна, сравни её с гарантированной доходностью депозита
+  и ценностью ликвидной подушки. Рассрочку 0% не советуй срочно закрывать.
+- Молодой возраст сам по себе не означает высокую терпимость к риску. Горизонт
+  цели и указанный профиль риска важнее.
+- Считай подушкой только депозит, явно отмеченный как резерв/на чёрный день,
+  а не все депозиты и инвестиции.
 - Используй только Telegram HTML <b>, без markdown.
 """.strip()
 
@@ -170,12 +191,29 @@ def build_asset_advice_summary(
     summary: WealthSummary, goals: list[FinancialGoal]
 ) -> str:
     """Build compact, factual asset context for the AI review."""
+    deposits_share = summary.deposits_kzt / summary.total_kzt * 100 if summary.total_kzt else 0
+    broker_kzt = summary.broker_total_usd * summary.usd_kzt
+    broker_share = broker_kzt / summary.total_kzt * 100 if summary.total_kzt else 0
     lines = [
         "Активы:",
         f"- Общий капитал: {summary.total_kzt:.0f} KZT / {summary.total_usd:.2f} USD.",
         f"- Брокерский счёт: {summary.broker_total_usd:.2f} USD; "
         f"депозиты: {summary.deposits_kzt:.0f} KZT.",
+        f"- Структура капитала: депозиты {deposits_share:.1f}%, "
+        f"брокерский счёт {broker_share:.1f}%.",
     ]
+    emergency_kzt = sum(
+        float(item.balance) * (summary.usd_kzt if item.currency == "USD" else 1)
+        for item in summary.deposits
+        if any(
+            marker in item.name.casefold()
+            for marker in ("чёрн", "черн", "резерв", "подуш")
+        )
+    )
+    if emergency_kzt:
+        lines.append(
+            f"- Отдельный неприкосновенный резерв: {emergency_kzt:.0f} KZT."
+        )
     unrealized = sum(item.profit_usd for item in summary.positions)
     realized = (
         float(summary.broker_account.realized_pnl_usd) if summary.broker_account else 0
@@ -187,7 +225,8 @@ def build_asset_advice_summary(
     if summary.positions:
         positions = ", ".join(
             f"{item.position.symbol} {item.value_usd:.2f} USD "
-            f"({item.profit_percent:+.1f}%)"
+            f"(вес {item.value_usd / summary.portfolio_usd * 100:.1f}%, "
+            f"P/L {item.profit_percent:+.1f}%)"
             for item in summary.positions
         )
         lines.append(f"- Позиции: {positions}.")
@@ -197,7 +236,8 @@ def build_asset_advice_summary(
         progress = current / target * 100 if target else 0
         lines.append(
             f"- Цель {goal.title}: {progress:.1f}% выполнено, "
-            f"осталось {max(0, 100 - progress):.1f}%."
+            f"осталось {max(0, target - current):.0f} {goal.currency} "
+            f"({max(0, 100 - progress):.1f}%)."
         )
     return "\n".join(lines)
 
@@ -290,7 +330,23 @@ class AdvisorService:
 
         # Living situation — tells the hypothetical-budget section whether to
         # invent rent/food money the user doesn't actually spend.
-        living_lines: list[str] = []
+        living_lines: list[str] = [
+            f"Возраст: {user.age if user.age is not None else 'не указан'}.",
+            "Финансовый риск: "
+            f"{user.risk_tolerance if user.risk_tolerance else 'не указан'}.",
+        ]
+        if user.debt_balance is not None:
+            debt_line = f"Остаток долгов: {float(user.debt_balance):.0f} ₸"
+            if user.debt_annual_rate is not None:
+                debt_line += (
+                    f", максимальная ставка {float(user.debt_annual_rate):g}% годовых"
+                )
+            living_lines.append(debt_line + ".")
+        else:
+            living_lines.append(
+                "Остаток долгов и ставки не указаны: нельзя делать вывод "
+                "о размере долга или выгоде досрочного погашения."
+            )
         if user.housing_is_free is True:
             living_lines.append("Жильё: бесплатно (живёт с семьёй/родителями).")
         elif user.housing_is_free is False:

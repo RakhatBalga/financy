@@ -198,5 +198,31 @@ def test_ai_asset_summary_contains_portfolio_deposits_goal_and_capital() -> None
 
     assert "Общий капитал: 625000 KZT / 1250.00 USD" in text
     assert "депозиты: 500000 KZT" in text
+    assert "Структура капитала: депозиты 80.0%, брокерский счёт 20.0%" in text
+    assert "вес 100.0%, P/L +20.0%" in text
     assert "общий +140.00 USD" in text
     assert "Цель Квартира: 6.2% выполнено" in text
+    assert "осталось 9375000 KZT" in text
+
+
+def test_ai_asset_summary_separates_emergency_reserve() -> None:
+    regular = Deposit(
+        id=1,
+        user_id=1,
+        name="Депозит 1",
+        balance=500_000,
+        currency="KZT",
+    )
+    reserve = Deposit(
+        id=2,
+        user_id=1,
+        name="На чёрный день",
+        balance=700,
+        currency="USD",
+    )
+    summary = WealthSummary([], [regular, reserve], 500)
+
+    text = build_asset_advice_summary(summary, [])
+
+    assert "депозиты: 850000 KZT" in text
+    assert "Отдельный неприкосновенный резерв: 350000 KZT" in text

@@ -47,3 +47,18 @@ class UserRepository:
         user.housing_is_free = housing_is_free
         user.food_is_free = food_is_free
         await self._session.flush()
+
+    async def set_financial_profile(
+        self,
+        user: User,
+        *,
+        age: int,
+        debt_balance: float | None,
+        debt_annual_rate: float | None,
+        risk_tolerance: str | None,
+    ) -> None:
+        user.age = age
+        user.debt_balance = debt_balance
+        user.debt_annual_rate = debt_annual_rate
+        user.risk_tolerance = risk_tolerance
+        await self._session.flush()
