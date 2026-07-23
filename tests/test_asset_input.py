@@ -74,14 +74,22 @@ def test_deposits_formatter_combines_items_and_total() -> None:
             balance=2_249_866,
             currency="KZT",
         ),
+        Deposit(
+            id=3,
+            user_id=1,
+            name="На чёрный день",
+            balance=700,
+            currency="USD",
+        ),
     ]
 
-    text = format_deposits(items)
+    text = format_deposits(items, usd_kzt=500)
 
-    assert "Всего: <b>2 314 666 ₸</b>" in text
+    assert "Всего: <b>2 664 666 ₸ · $5,329.33</b>" in text
     assert "Депозит 1</b> — 64 800 ₸" in text
     assert "15% годовых · ≈ +810 ₸/мес" in text
     assert "Депозит 2</b> — 2 249 866 ₸" in text
+    assert "На чёрный день</b> — $700.00 · 350 000 ₸" in text
 
 
 def test_goals_formatter_uses_complete_net_worth() -> None:

@@ -211,23 +211,35 @@ def format_deposit(item: Deposit, usd_kzt: float | None = None) -> str:
     return "\n".join(lines)
 
 
-def format_deposits(items: list[Deposit]) -> str:
+def format_deposits(
+    items: list[Deposit],
+    usd_kzt: float | None = None,
+) -> str:
     """Render all deposits in one compact message."""
     if not items:
         return "🏦 <b>Депозиты</b>\nПока нет депозитов."
 
     total_kzt = sum(float(item.balance) for item in items if item.currency == "KZT")
     total_usd = sum(float(item.balance) for item in items if item.currency == "USD")
-    totals = []
-    if total_kzt:
-        totals.append(format_kzt(total_kzt))
-    if total_usd:
-        totals.append(format_usd(total_usd))
+    if usd_kzt is not None:
+        total_kzt_equivalent = total_kzt + total_usd * usd_kzt
+        totals = [
+            format_kzt(total_kzt_equivalent),
+            format_usd(total_kzt_equivalent / usd_kzt),
+        ]
+    else:
+        totals = []
+        if total_kzt:
+            totals.append(format_kzt(total_kzt))
+        if total_usd:
+            totals.append(format_usd(total_usd))
 
     lines = ["🏦 <b>Депозиты</b>", f"Всего: <b>{' · '.join(totals)}</b>"]
     for item in items:
         balance = float(item.balance)
         amount = format_usd(balance) if item.currency == "USD" else format_kzt(balance)
+        if item.currency == "USD" and usd_kzt is not None:
+            amount += f" · {format_kzt(balance * usd_kzt)}"
         rate = ""
         if item.annual_rate is not None:
             monthly_interest = balance * float(item.annual_rate) / 1200

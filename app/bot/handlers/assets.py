@@ -158,15 +158,22 @@ async def show_portfolio(
 @router.message(Command("deposits"))
 @router.message(F.text.in_(DEPOSIT_BUTTONS))
 async def show_deposits(
-    message: Message, state: FSMContext, session: AsyncSession
+    message: Message,
+    state: FSMContext,
+    session: AsyncSession,
+    market: YahooFinanceService,
 ) -> None:
     await state.clear()
     user = await _user(message, session)
     if user is None:
         return
     items = await AssetService(session).deposits(user.id)
+    try:
+        usd_kzt = await market.usd_kzt()
+    except MarketDataError:
+        usd_kzt = None
     await message.answer(
-        format_deposits(items),
+        format_deposits(items, usd_kzt),
         reply_markup=deposit_actions_keyboard([(item.id, item.name) for item in items]),
     )
 
