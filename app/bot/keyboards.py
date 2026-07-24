@@ -45,10 +45,10 @@ CAPITAL_BUTTONS: frozenset[str] = frozenset({BTN_CAPITAL})
 
 ADVICE_PERIOD_PREFIX = "advice"
 ADVICE_PERIODS = {
-    "today": "Сегодня",
-    "week": "Неделя",
-    "month": "Месяц",
-    "overall": "В целом",
+    "today": "Бүгін",
+    "week": "Апта",
+    "month": "Ай",
+    "overall": "Жалпы",
 }
 
 # All reply-keyboard labels — FSM "waiting for a number" states exclude these so

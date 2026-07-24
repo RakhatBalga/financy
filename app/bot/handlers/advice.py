@@ -243,7 +243,7 @@ async def cmd_benchmark(message: Message, session: AsyncSession) -> None:
 @router.message(F.text.in_(AI_BUTTONS))
 async def show_advice_menu(message: Message) -> None:
     await message.answer(
-        "За какой период дать финансовое мнение?",
+        "Қай кезең бойынша қаржылық пікір керек?",
         reply_markup=advice_period_keyboard(),
     )
 
@@ -258,12 +258,16 @@ async def cmd_advice(
     raw_period = (command.args or "").strip().casefold()
     aliases = {
         "today": AdvicePeriod.today,
+        "бүгін": AdvicePeriod.today,
         "сегодня": AdvicePeriod.today,
         "week": AdvicePeriod.week,
+        "апта": AdvicePeriod.week,
         "неделя": AdvicePeriod.week,
         "month": AdvicePeriod.month,
+        "ай": AdvicePeriod.month,
         "месяц": AdvicePeriod.month,
         "overall": AdvicePeriod.overall,
+        "жалпы": AdvicePeriod.overall,
         "в целом": AdvicePeriod.overall,
     }
     if not raw_period:
@@ -272,9 +276,9 @@ async def cmd_advice(
     period = aliases.get(raw_period)
     if period is None:
         await message.answer(
-            "Период не распознан. Используйте: "
+            "Кезең танылмады. Мыналардың бірін қолданыңыз: "
             "<code>/advice today</code>, <code>week</code>, "
-            "<code>month</code> или <code>overall</code>."
+            "<code>month</code> немесе <code>overall</code>."
         )
         return
     await _run_advice(message, session, market, period)
@@ -289,7 +293,7 @@ async def choose_advice_period(
     assert callback.data is not None
     raw_period = callback.data.split(":", 1)[1]
     if raw_period not in ADVICE_PERIODS:
-        await callback.answer("Неизвестный период.", show_alert=True)
+        await callback.answer("Белгісіз кезең.", show_alert=True)
         return
     await callback.answer()
     if isinstance(callback.message, Message):
@@ -342,7 +346,9 @@ async def _run_advice(
             user_id=user.id,
             period=period.value,
         )
-        await message.answer("Не удалось получить мнение ИИ. Попробуйте чуть позже.")
+        await message.answer(
+            "ЖИ пікірін алу мүмкін болмады. Сәл кейінірек қайталап көріңіз."
+        )
         return
     await _safe_send(message, format_advice(advice))
 

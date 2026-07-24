@@ -64,3 +64,8 @@ def test_advice_period_keyboard_contains_all_scopes() -> None:
         "advice:month",
         "advice:overall",
     }
+    assert [
+        button.text
+        for row in keyboard.inline_keyboard
+        for button in row
+    ] == ["Бүгін", "Апта", "Ай", "Жалпы"]

@@ -531,7 +531,7 @@ def format_benchmark(rows: list[tuple[str, float, float]]) -> str:
 
 
 def format_advice(advice: str) -> str:
-    return f"🧠 <b>Финансовый разбор</b>\n\n{advice}"
+    return f"🧠 <b>Қаржылық талдау</b>\n\n{advice}"
 
 
 def format_recent(transactions: list[Transaction], currency: str) -> str:
